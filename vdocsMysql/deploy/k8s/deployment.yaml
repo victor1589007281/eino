@@ -1,0 +1,160 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-expert-agent
+  namespace: mysql-expert
+  labels:
+    app.kubernetes.io/name: mysql-expert-agent
+    app.kubernetes.io/component: agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mysql-expert-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mysql-expert-agent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mysql-expert-agent
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      
+      containers:
+        - name: mysql-expert-agent
+          image: harbor.example.com/mysql-expert/mysql-expert-agent:latest
+          imagePullPolicy: IfNotPresent
+          
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          
+          env:
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-expert-agent-secrets
+                  key: OPENAI_API_KEY
+            - name: WENXIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-expert-agent-secrets
+                  key: WENXIN_API_KEY
+            - name: WENXIN_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-expert-agent-secrets
+                  key: WENXIN_SECRET_KEY
+            - name: QWEN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-expert-agent-secrets
+                  key: QWEN_API_KEY
+            - name: DEEPSEEK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-expert-agent-secrets
+                  key: DEEPSEEK_API_KEY
+          
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+            - name: data
+              mountPath: /data
+            - name: source
+              mountPath: /data/source
+              readOnly: true
+          
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+          
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+      
+      volumes:
+        - name: config
+          configMap:
+            name: mysql-expert-agent-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: mysql-expert-agent-data
+        - name: source
+          persistentVolumeClaim:
+            claimName: mysql-source-code
+      
+      nodeSelector:
+        kubernetes.io/os: linux
+      
+      tolerations:
+        - key: "workload"
+          operator: "Equal"
+          value: "ai"
+          effect: "NoSchedule"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-expert-agent
+  namespace: mysql-expert
+  labels:
+    app.kubernetes.io/name: mysql-expert-agent
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: mysql-expert-agent
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mysql-expert-agent
+  namespace: mysql-expert
+  labels:
+    app.kubernetes.io/name: mysql-expert-agent

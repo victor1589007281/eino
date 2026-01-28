@@ -1,0 +1,125 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kernel-expert.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kernel-expert.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    server:
+      port: {{ .Values.server.port }}
+      mode: {{ .Values.server.mode | quote }}
+      
+    index:
+      storage_path: {{ .Values.index.storagePath | quote }}
+      auto_build: {{ .Values.index.autoBuild }}
+      incremental_threshold: {{ .Values.index.incrementalThreshold }}
+      rebuild_cron: {{ .Values.index.rebuildCron | quote }}
+      compression: {{ .Values.index.compression }}
+      
+    cache:
+      l1:
+        type: "memory"
+        max_size: {{ .Values.cache.l1.maxSize }}
+        ttl: {{ .Values.cache.l1.ttl | quote }}
+      l2:
+        type: "disk"
+        path: "/data/cache"
+        max_size: {{ .Values.cache.l2.maxSize | quote }}
+        ttl: {{ .Values.cache.l2.ttl | quote }}
+      l3:
+        type: "redis"
+        url: {{ include "kernel-expert.redisUrl" . | quote }}
+        ttl: {{ .Values.cache.l3.ttl | quote }}
+        
+    memory:
+      short_term_limit: {{ .Values.memory.shortTermLimit }}
+      working_memory_limit: {{ .Values.memory.workingMemoryLimit }}
+      long_term_storage: {{ .Values.memory.longTermStorage | quote }}
+      embedding_model: {{ .Values.memory.embeddingModel | quote }}
+      similarity_threshold: {{ .Values.memory.similarityThreshold }}
+      
+    statistics:
+      enabled: {{ .Values.statistics.enabled }}
+      token_tracking: {{ .Values.statistics.tokenTracking }}
+      cache_tracking: {{ .Values.statistics.cacheTracking }}
+      performance_tracking: {{ .Values.statistics.performanceTracking }}
+      prometheus:
+        enabled: {{ .Values.serviceMonitor.enabled }}
+        endpoint: "/metrics"
+        
+    routing:
+      default_strategy: {{ .Values.routing.defaultStrategy | quote }}
+      strategies:
+        complexity:
+          enabled: {{ .Values.routing.strategies.complexity.enabled }}
+        cost:
+          enabled: {{ .Values.routing.strategies.cost.enabled }}
+          {{- if .Values.routing.strategies.cost.enabled }}
+          budget_limit: {{ .Values.routing.strategies.cost.budgetLimit }}
+          {{- end }}
+        latency:
+          enabled: {{ .Values.routing.strategies.latency.enabled }}
+          {{- if .Values.routing.strategies.latency.enabled }}
+          max_latency: {{ .Values.routing.strategies.latency.maxLatency | quote }}
+          {{- end }}
+        load_balance:
+          enabled: {{ .Values.routing.strategies.loadBalance.enabled }}
+          
+    interaction:
+      protocols:
+        a2a:
+          enabled: {{ .Values.interaction.a2a.enabled }}
+          endpoint: {{ .Values.interaction.a2a.endpoint | quote }}
+        mcp:
+          enabled: {{ .Values.interaction.mcp.enabled }}
+          endpoint: {{ .Values.interaction.mcp.endpoint | quote }}
+        rest:
+          enabled: {{ .Values.interaction.rest.enabled }}
+          endpoint: {{ .Values.interaction.rest.endpoint | quote }}
+          
+    models:
+      openai:
+        enabled: {{ .Values.models.openai.enabled }}
+      anthropic:
+        enabled: {{ .Values.models.anthropic.enabled }}
+      qwen:
+        enabled: {{ .Values.models.qwen.enabled }}
+      zhipu:
+        enabled: {{ .Values.models.zhipu.enabled }}
+      moonshot:
+        enabled: {{ .Values.models.moonshot.enabled }}
+      deepseek:
+        enabled: {{ .Values.models.deepseek.enabled }}
+      baichuan:
+        enabled: {{ .Values.models.baichuan.enabled }}
+      ernie:
+        enabled: {{ .Values.models.ernie.enabled }}
+      ollama:
+        enabled: {{ .Values.models.ollama.enabled }}
+        {{- if .Values.models.ollama.enabled }}
+        endpoint: {{ .Values.models.ollama.endpoint | quote }}
+        {{- end }}
+        
+    logging:
+      level: {{ .Values.logging.level | quote }}
+      format: {{ .Values.logging.format | quote }}
+      output: {{ .Values.logging.output | quote }}
+      
+    database:
+      url: {{ include "kernel-expert.postgresUrl" . | quote }}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kernel-expert.fullname" . }}-env
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kernel-expert.labels" . | nindent 4 }}
+data:
+  CONFIG_PATH: "/app/config/config.yaml"
+  SERVER_PORT: {{ .Values.server.port | quote }}
+  LOG_LEVEL: {{ .Values.logging.level | quote }}
+  LOG_FORMAT: {{ .Values.logging.format | quote }}

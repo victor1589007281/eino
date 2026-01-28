@@ -1,0 +1,120 @@
+# 微信公众号文章润色专家 Agent 配置文件
+
+# 服务器配置
+server:
+  port: 8080
+  read_timeout: 5s
+  write_timeout: 10s
+  idle_timeout: 60s
+
+# LLM配置
+llm:
+  provider: "deepseek"           # 默认提供商: deepseek, openai, claude, qwen, ollama
+  default_model: "deepseek-chat"
+  max_tokens: 4096
+  temperature: 0.3
+  request_timeout: 60s
+  max_retries: 3
+  retry_interval: 2s
+  local_model_path: ""           # 本地模型路径（Ollama）
+  
+  # API密钥（建议使用环境变量）
+  api_keys:
+    deepseek: "${DEEPSEEK_API_KEY}"
+    openai: "${OPENAI_API_KEY}"
+    claude: "${ANTHROPIC_API_KEY}"
+    qwen: "${QWEN_API_KEY}"
+  
+  # 模型路由配置
+  model_routing:
+    - intent_type: "grammar"
+      model_name: "deepseek-chat"
+      priority: 1
+    - intent_type: "style"
+      model_name: "deepseek-chat"
+      priority: 1
+    - intent_type: "logic"
+      model_name: "deepseek-chat"
+      priority: 2
+    - intent_type: "structure"
+      model_name: "deepseek-chat"
+      priority: 1
+
+# Agent配置
+agent:
+  max_iterations: 20             # 最大迭代次数
+  max_concurrent_agents: 5       # 最大并发Agent数
+  timeout: 300s                  # 超时时间
+  enable_sub_agents: true        # 启用子Agent
+
+# 输入配置
+input:
+  markdown_file_path: "./articles"
+  max_file_size_mb: 10
+
+# 输出配置
+output:
+  work_directory: "./output"
+  format: "markdown"             # 输出格式: markdown, html, json
+  include_diagrams: true
+  include_code_refs: false
+  summary_max_length: 500
+
+# 索引配置
+index:
+  path: "./data/index"
+  rebuild_on_start: false
+  parallel_workers: 4
+  min_token_length: 2
+  max_token_length: 20
+  stop_words_file: ""
+  embedding_model: "text-embedding-ada-002"
+  vector_db_provider: "local"    # local, chroma, faiss
+  vector_db_addr: ""
+
+# 存储配置
+storage:
+  provider: "sqlite"             # sqlite, mysql, postgres
+  local_db_path: "./data"
+  dsn: ""
+  max_open_conns: 10
+  max_idle_conns: 5
+  conn_max_lifetime: 5m
+
+# 缓存配置
+cache:
+  enable: true
+  provider: "lru"                # lru, redis, sqlite
+  ttl: 30m
+  max_size: 10000                # LRU最大条目数
+  redis_addr: ""
+  redis_password: ""
+  redis_db: 0
+
+# 统计配置
+stats:
+  enable: true
+  report_interval: 60s
+  metrics_endpoint: "/metrics"
+
+# 技能配置
+skills:
+  directory: "./skills"
+  enable: true
+
+# K8S部署配置
+k8s:
+  enable: false
+  namespace: "wechat-polish"
+  image: "wechat-polish:latest"
+  replicas: 2
+  resource_cpu: "500m"
+  resource_memory: "512Mi"
+  ingress_host: "wechat-polish.example.com"
+  ingress_tls_secret: ""
+
+# 外部Agent交互配置
+external:
+  enable_agent_interaction: false
+  agent_endpoints: {}
+  auth_tokens: {}

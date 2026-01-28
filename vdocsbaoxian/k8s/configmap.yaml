@@ -1,0 +1,133 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: insurance-expert-config
+  namespace: insurance-expert
+  labels:
+    app: insurance-expert
+data:
+  config.yaml: |
+    log:
+      level: info
+      format: json
+      output: stdout
+
+    data_sources:
+      legal_db: /data/legal
+      product_db: /data/products
+      claim_db: /data/claims
+      health_db: /data/health
+      web_cache: /data/webcache
+
+    index:
+      path: /data/index
+      rebuild_on_start: false
+      parallel_workers: 4
+      batch_size: 500
+      update_interval: 1h
+      persistence:
+        persist_on_build: true
+        persist_interval: 30m
+        persist_on_shutdown: true
+        local_path: /data/index
+        recovery_strategy: auto
+
+    cache:
+      l1:
+        enabled: true
+        max_size: 5000
+        ttl: 5m
+        shard_count: 16
+      l2:
+        enabled: true
+        backend: redis
+        ttl: 30m
+        redis:
+          mode: standalone
+          addresses:
+            - redis-service:6379
+          database: 0
+          pool_size: 10
+      l3:
+        enabled: true
+        db_path: /data/cache/l3.db
+        ttl: 24h
+        compression: true
+
+    storage:
+      primary: sqlite
+      sqlite:
+        path: /data/insurance_expert.db
+        max_open_conns: 10
+        max_idle_conns: 5
+        journal_mode: WAL
+        synchronous: NORMAL
+      boltdb:
+        path: /data/knowledge_graph.db
+
+    stats:
+      token:
+        enabled: true
+        count_method: estimate
+        budget_enabled: true
+        daily_budget: 1000000
+        alert_threshold: 0.8
+      cache:
+        enabled: true
+        detail_level: standard
+        report_interval: 5m
+      prometheus:
+        enabled: true
+        port: 9090
+        path: /metrics
+        namespace: insurance_expert
+
+    agent:
+      max_iterations: 20
+      max_concurrent_agents: 5
+      timeout: 5m
+      enable_streaming: true
+      verify_mode: true
+
+    output:
+      mode: document
+      include_diagrams: true
+      include_sources: true
+      verify_annotations: true
+      output_dir: /data/output
+
+    verify:
+      enabled: true
+      legal_verify: true
+      source_verify: true
+      timeliness_check: true
+      min_confidence: 0.7
+
+    llm:
+      default_provider: zhipu
+      default_model: glm-4
+      routing:
+        enabled: true
+        strategy: smart
+      fallback:
+        enabled: true
+        max_attempts: 3
+
+    interaction:
+      rest_server:
+        enabled: true
+        address: ":8080"
+        base_path: /api/v1
+        cors:
+          enabled: true
+          allow_origins:
+            - "*"
+          allow_methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - OPTIONS
+          allow_headers:
+            - Content-Type
+            - Authorization

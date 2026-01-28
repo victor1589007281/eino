@@ -1,0 +1,281 @@
+# Default values for kernel-expert
+nameOverride: ""
+fullnameOverride: ""
+
+# 镜像配置
+image:
+  repository: registry.example.com/kernel-expert
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# 服务配置
+server:
+  port: 8080
+  mode: "production"
+
+# Agent配置
+agent:
+  replicas: 3
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2000m"
+      memory: "4Gi"
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []
+
+# Worker配置
+worker:
+  replicas: 2
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+
+# 服务账号
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# 自动伸缩
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilization: 70
+  targetMemoryUtilization: 80
+  customMetrics: false
+  targetRequestRate: "100"
+
+# Pod中断预算
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# 索引配置
+index:
+  storagePath: "/data/index"
+  autoBuild: true
+  incrementalThreshold: 100
+  rebuildCron: "0 3 * * 0"
+  compression: true
+
+# 缓存配置
+cache:
+  l1:
+    maxSize: 1000
+    ttl: "1h"
+  l2:
+    maxSize: "1Gi"
+    ttl: "24h"
+  l3:
+    ttl: "7d"
+
+# 记忆配置
+memory:
+  shortTermLimit: 20
+  workingMemoryLimit: 50
+  longTermStorage: "postgresql"
+  embeddingModel: "text-embedding-3-small"
+  similarityThreshold: 0.7
+
+# 统计配置
+statistics:
+  enabled: true
+  tokenTracking: true
+  cacheTracking: true
+  performanceTracking: true
+  reportSchedule: "0 0 * * *"
+  reportRetention: "30d"
+
+# 路由配置
+routing:
+  defaultStrategy: "complexity"
+  strategies:
+    complexity:
+      enabled: true
+    cost:
+      enabled: false
+      budgetLimit: 10.0
+    latency:
+      enabled: false
+      maxLatency: "5s"
+    loadBalance:
+      enabled: false
+
+# 交互配置
+interaction:
+  a2a:
+    enabled: true
+    endpoint: "/a2a"
+  mcp:
+    enabled: true
+    endpoint: "/mcp"
+  rest:
+    enabled: true
+    endpoint: "/api/v1"
+
+# 模型配置
+models:
+  openai:
+    enabled: true
+  anthropic:
+    enabled: true
+  qwen:
+    enabled: true
+  zhipu:
+    enabled: true
+  moonshot:
+    enabled: true
+  deepseek:
+    enabled: true
+  baichuan:
+    enabled: false
+  ernie:
+    enabled: false
+  ollama:
+    enabled: false
+    endpoint: "http://ollama:11434"
+
+# Secrets (需要在部署时覆盖)
+secrets:
+  openaiApiKey: ""
+  anthropicApiKey: ""
+  dashscopeApiKey: ""
+  zhipuApiKey: ""
+  moonshotApiKey: ""
+  deepseekApiKey: ""
+  baichuanApiKey: ""
+  ernieApiKey: ""
+  ernieSecretKey: ""
+  postgresUrl: ""
+  redisUrl: ""
+  agentApiKey: ""
+  jwtSecret: ""
+
+# Ingress配置
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+  hosts:
+    - host: kernel-expert.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: kernel-expert-tls
+      hosts:
+        - kernel-expert.example.com
+
+# 持久化配置
+persistence:
+  index:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: "50Gi"
+  source:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: "10Gi"
+
+# Redis子chart配置
+redis:
+  enabled: true
+  architecture: replication
+  auth:
+    enabled: true
+    password: ""
+  master:
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+    persistence:
+      enabled: true
+      size: "8Gi"
+  replica:
+    replicaCount: 2
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+    persistence:
+      enabled: true
+      size: "8Gi"
+
+# PostgreSQL子chart配置
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: ""
+    database: "kernel_expert"
+  primary:
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+    persistence:
+      enabled: true
+      size: "10Gi"
+
+# 监控配置
+serviceMonitor:
+  enabled: false
+  interval: "30s"
+  scrapeTimeout: "10s"
+
+# 告警配置
+alerts:
+  enabled: false
+  rules:
+    highErrorRate:
+      enabled: true
+      threshold: 0.05
+      for: "5m"
+    highLatency:
+      enabled: true
+      threshold: 5
+      for: "5m"
+    lowCacheHitRate:
+      enabled: true
+      threshold: 0.5
+      for: "10m"
+
+# 日志配置
+logging:
+  level: "info"
+  format: "json"
+  output: "stdout"
+
+# 健康检查配置
+healthCheck:
+  liveness:
+    enabled: true
+    path: "/health"
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: "/ready"
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3

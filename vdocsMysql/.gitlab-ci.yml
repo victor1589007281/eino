@@ -1,0 +1,272 @@
+# GitLab CI/CD configuration for MySQL Expert Agent
+# Reference: /Users/huaquan.liang/work/src/rds-backend/.gitlab-ci.yml
+
+stages:
+  - test
+  - build
+  - security
+  - deploy
+
+variables:
+  GO_VERSION: "1.22"
+  GOLANGCI_LINT_VERSION: "v1.59.1"
+  DOCKER_REGISTRY: harbor.example.com
+  DOCKER_IMAGE: ${DOCKER_REGISTRY}/mysql-expert/mysql-expert-agent
+  COVERAGE_THRESHOLD: "70"
+  DIFF_COVER_REF: "origin"
+  DIFF_COVER_BRANCH: "master"
+  DIFF_COVER_FAIL_UNDER: "80"
+
+default:
+  image: golang:${GO_VERSION}-bullseye
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - .go/pkg/mod/
+    policy: pull-push
+  before_script:
+    - export GOPATH="$CI_PROJECT_DIR/.go"
+    - export PATH="$GOPATH/bin:$PATH"
+    - mkdir -p "$GOPATH/bin"
+    - go version
+
+# Lint检查
+lint:
+  stage: test
+  image: golangci/golangci-lint:${GOLANGCI_LINT_VERSION}
+  script:
+    - export GO111MODULE=on
+    - make deps
+    - make lint
+  only:
+    - merge_requests
+    - master
+    - main
+  allow_failure: false
+
+# 代码格式检查
+format-check:
+  stage: test
+  script:
+    - make check-fmt
+  only:
+    - merge_requests
+  allow_failure: false
+
+# 单元测试
+unit-test:
+  stage: test
+  script:
+    - make deps
+    - make test
+  coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
+  artifacts:
+    when: always
+    paths:
+      - coverage/
+    reports:
+      junit: coverage/junit.xml
+    expire_in: 1 week
+  only:
+    - merge_requests
+    - master
+    - main
+
+# 差异覆盖率检查 (MR only)
+diff-coverage:
+  stage: test
+  image: golang:${GO_VERSION}-bullseye
+  script:
+    - apt-get -qq update
+    - apt-get -qq install python3-pip git -y
+    - pip3 install diff_cover --quiet
+    - go install github.com/axw/gocov/gocov@latest
+    - go install github.com/AlekSi/gocov-xml@latest
+    - go install github.com/matm/gocov-html/cmd/gocov-html@latest
+    - export GO111MODULE=on
+    - make deps
+    - make test
+    - make diff-coverage
+  artifacts:
+    when: always
+    paths:
+      - coverage/
+    expire_in: 1 week
+  only:
+    - merge_requests
+  allow_failure: true
+
+# 集成测试
+integration-test:
+  stage: test
+  script:
+    - make deps
+    - make test-integration
+  only:
+    - merge_requests
+    - master
+    - main
+  allow_failure: true
+  when: manual
+
+# 基准测试
+benchmark:
+  stage: test
+  script:
+    - make deps
+    - make benchmark
+  artifacts:
+    paths:
+      - benchmark-results.txt
+    expire_in: 1 week
+  only:
+    - master
+    - main
+  when: manual
+
+# 构建二进制 (dry-run for MR)
+build-dry-run:
+  stage: build
+  script:
+    - make deps
+    - make build
+  artifacts:
+    paths:
+      - bin/
+    expire_in: 1 day
+  only:
+    - merge_requests
+
+# 构建Docker镜像
+build:
+  stage: build
+  image: docker:24-cli
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_VERIFY: 1
+    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+  before_script:
+    - echo ${DOCKER_PASSWORD} | docker login --username ${DOCKER_USERNAME} --password-stdin ${DOCKER_REGISTRY}
+  script:
+    - |
+      docker build \
+        --build-arg VERSION=${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}} \
+        --build-arg COMMIT=${CI_COMMIT_SHORT_SHA} \
+        --build-arg BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S') \
+        -t ${DOCKER_IMAGE}:${CI_COMMIT_SHORT_SHA} \
+        .
+    - docker push ${DOCKER_IMAGE}:${CI_COMMIT_SHORT_SHA}
+  only:
+    - master
+    - main
+    - tags
+
+# 构建并打标签 (release)
+build-release:
+  stage: build
+  image: docker:24-cli
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - echo ${DOCKER_PASSWORD} | docker login --username ${DOCKER_USERNAME} --password-stdin ${DOCKER_REGISTRY}
+  script:
+    - |
+      docker build \
+        --build-arg VERSION=${CI_COMMIT_TAG} \
+        --build-arg COMMIT=${CI_COMMIT_SHORT_SHA} \
+        --build-arg BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S') \
+        -t ${DOCKER_IMAGE}:${CI_COMMIT_TAG} \
+        -t ${DOCKER_IMAGE}:latest \
+        .
+    - docker push ${DOCKER_IMAGE}:${CI_COMMIT_TAG}
+    - docker push ${DOCKER_IMAGE}:latest
+  only:
+    - tags
+
+# 安全扫描
+security-scan:
+  stage: security
+  script:
+    - go install golang.org/x/vuln/cmd/govulncheck@latest
+    - govulncheck ./...
+  allow_failure: true
+  only:
+    - merge_requests
+    - master
+    - main
+
+# 依赖扫描
+dependency-scan:
+  stage: security
+  script:
+    - go list -m all
+    - go mod verify
+  only:
+    - merge_requests
+  allow_failure: true
+
+# 部署到开发环境
+deploy-dev:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  environment:
+    name: development
+    url: https://mysql-expert-dev.example.com
+  script:
+    - kubectl config use-context dev-cluster
+    - kubectl set image deployment/mysql-expert-agent mysql-expert-agent=${DOCKER_IMAGE}:${CI_COMMIT_SHORT_SHA} -n mysql-expert
+    - kubectl rollout status deployment/mysql-expert-agent -n mysql-expert --timeout=300s
+  only:
+    - master
+    - main
+  when: manual
+
+# 部署到生产环境
+deploy-prod:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  environment:
+    name: production
+    url: https://mysql-expert.example.com
+  script:
+    - kubectl config use-context prod-cluster
+    - kubectl set image deployment/mysql-expert-agent mysql-expert-agent=${DOCKER_IMAGE}:${CI_COMMIT_TAG} -n mysql-expert
+    - kubectl rollout status deployment/mysql-expert-agent -n mysql-expert --timeout=300s
+  only:
+    - tags
+  when: manual
+
+# Helm部署到开发环境
+helm-deploy-dev:
+  stage: deploy
+  image: alpine/helm:3.14
+  script:
+    - helm upgrade --install mysql-expert-agent ./deploy/helm/mysql-expert-agent
+      --namespace mysql-expert
+      --set image.tag=${CI_COMMIT_SHORT_SHA}
+      --set config.environment=development
+      --values ./deploy/helm/mysql-expert-agent/values-dev.yaml
+      --wait
+      --timeout 5m
+  environment:
+    name: development
+  only:
+    - master
+  when: manual
+
+# 清理旧镜像
+cleanup:
+  stage: deploy
+  image: docker:24-cli
+  script:
+    - echo "Cleaning up old images..."
+    # Add cleanup logic for old images
+  only:
+    - schedules
+  when: manual

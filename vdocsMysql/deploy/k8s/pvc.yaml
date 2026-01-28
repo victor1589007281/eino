@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-expert-agent-data
+  namespace: mysql-expert
+  labels:
+    app.kubernetes.io/name: mysql-expert-agent
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-source-code
+  namespace: mysql-expert
+  labels:
+    app.kubernetes.io/name: mysql-expert-agent
+spec:
+  accessModes:
+    - ReadOnlyMany
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 50Gi

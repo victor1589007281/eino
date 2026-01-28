@@ -1,0 +1,223 @@
+# Default values for mysql-expert-agent
+
+# Replica count
+replicaCount: 1
+
+# Image configuration
+image:
+  repository: harbor.example.com/mysql-expert/mysql-expert-agent
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Image pull secrets
+imagePullSecrets: []
+
+# Service account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9090"
+  prometheus.io/path: "/metrics"
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+  metricsPort: 9090
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+  hosts:
+    - host: mysql-expert.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: mysql-expert-tls
+      hosts:
+        - mysql-expert.example.com
+
+# Resource limits and requests
+resources:
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+# Autoscaling
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Node selector
+nodeSelector:
+  kubernetes.io/os: linux
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Persistence
+persistence:
+  enabled: true
+  storageClassName: standard
+  accessMode: ReadWriteOnce
+  size: 20Gi
+
+# Source code PVC
+sourceCodePvc:
+  enabled: true
+  existingClaim: ""
+  storageClassName: standard
+  accessMode: ReadOnlyMany
+  size: 50Gi
+
+# Configuration
+config:
+  # Environment (development, staging, production)
+  environment: production
+  
+  # Log level (debug, info, warn, error)
+  logLevel: info
+  
+  # Index settings
+  index:
+    rebuildOnStart: false
+    parallelWorkers: 8
+    batchSize: 1000
+  
+  # Cache settings
+  cache:
+    l1:
+      enabled: true
+      maxSize: 10000
+      ttl: 5m
+    l2:
+      enabled: true
+      backend: local
+      ttl: 30m
+    l3:
+      enabled: true
+      ttl: 24h
+  
+  # Agent settings
+  agent:
+    maxIterations: 20
+    maxConcurrentAgents: 5
+    timeout: 5m
+    enableStreaming: true
+  
+  # LLM settings
+  llm:
+    defaultProvider: openai
+    defaultModel: gpt-4-turbo
+    routing:
+      enabled: true
+      strategy: smart
+    fallback:
+      enabled: true
+      maxAttempts: 3
+  
+  # Stats settings
+  stats:
+    token:
+      enabled: true
+      dailyBudget: 1000000
+      alertThreshold: 0.8
+    cache:
+      enabled: true
+      reportInterval: 5m
+    prometheus:
+      enabled: true
+      port: 9090
+      path: /metrics
+
+# Secrets - API Keys (set via --set or values override)
+secrets:
+  openaiApiKey: ""
+  azureOpenaiApiKey: ""
+  wenxinApiKey: ""
+  wenxinSecretKey: ""
+  qwenApiKey: ""
+  deepseekApiKey: ""
+  sparkAppId: ""
+  sparkApiKey: ""
+  sparkApiSecret: ""
+
+# External secrets (if using external-secrets operator)
+externalSecrets:
+  enabled: false
+  secretStoreRef:
+    name: ""
+    kind: SecretStore
+
+# Probes
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# ServiceMonitor for Prometheus Operator
+serviceMonitor:
+  enabled: false
+  namespace: monitoring
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+
+# PodDisruptionBudget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# Network policies
+networkPolicy:
+  enabled: false
+  ingress: []
+  egress: []

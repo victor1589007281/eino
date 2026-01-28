@@ -1,0 +1,24 @@
+apiVersion: v2
+name: mysql-expert-agent
+description: MySQL Kernel Expert Agent - Source code analysis and Q&A powered by LLM
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+home: https://github.com/cloudwego/eino
+sources:
+  - https://github.com/cloudwego/eino
+
+maintainers:
+  - name: MySQL Expert Team
+    email: mysql-expert@example.com
+
+keywords:
+  - mysql
+  - agent
+  - llm
+  - source-code-analysis
+  - ai
+
+annotations:
+  category: AI/ML

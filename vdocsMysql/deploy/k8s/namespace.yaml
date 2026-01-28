@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mysql-expert
+  labels:
+    app.kubernetes.io/name: mysql-expert-agent
+    app.kubernetes.io/part-of: mysql-expert

@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wechat-polish-config
+  namespace: wechat-polish
+  labels:
+    app: wechat-polish
+data:
+  config.yaml: |
+    paths:
+      work_path: "/app/workspace"
+      input_path: "/app/workspace/input"
+      output_path: "/app/workspace/output"
+      skills_path: "/app/skills"
+    
+    index:
+      type: "sqlite"
+      path: "/app/data/index.db"
+      rebuild_on_start: false
+      parallel_workers: 4
+    
+    llm:
+      deepseek:
+        enabled: true
+        api_key_env: "DEEPSEEK_API_KEY"
+        base_url: "https://api.deepseek.com/v1"
+        model: "deepseek-chat"
+        max_tokens: 4096
+        temperature: 0.3
+      
+      qwen:
+        enabled: true
+        api_key_env: "QWEN_API_KEY"
+        base_url: "https://dashscope.aliyuncs.com/api/v1"
+        model: "qwen-max"
+        max_tokens: 4096
+        temperature: 0.3
+      
+      ollama:
+        enabled: false
+        base_url: "http://ollama-service:11434"
+        model: "qwen2.5:14b"
+    
+    router:
+      default_model: "deepseek"
+      strategies:
+        simple:
+          primary: "qwen"
+          fallback: "deepseek"
+        medium:
+          primary: "deepseek"
+          fallback: "qwen"
+        complex:
+          primary: "deepseek"
+          fallback: "qwen"
+      fallbacks:
+        - "qwen"
+        - "deepseek"
+    
+    agent:
+      max_iterations: 20
+      max_concurrent_agents: 5
+      timeout: 300s
+      agents:
+        - grammar
+        - logic
+        - structure
+        - style
+        - content
+    
+    output:
+      mode: "document"
+      include_diff: true
+      include_stats: true
+      include_suggestions: true
+    
+    cache:
+      enabled: true
+      type: "memory"
+      ttl: 30m
+      max_size: 10000
+      l1:
+        max_size: 10000
+      l2:
+        path: "/app/data/cache.db"
+        sync_interval: 30s
+      llm:
+        ttl: 1h
+        max_tokens: 8192
+        similarity_threshold: 0.85
+      index:
+        term_cache_size: 5000
+        doc_cache_size: 1000
+        summary_cache_size: 500
+      memory:
+        session_ttl: 24h
+        max_history: 20
+        persist_interval: 5m
+    
+    stats:
+      enabled: true
+      export_interval: 60s
+      export_format: "json"
+      export_path: "/app/data/stats"
+    
+    api:
+      enabled: true
+      port: 8080
+      host: "0.0.0.0"

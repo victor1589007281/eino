@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: insurance-expert
+  labels:
+    app: insurance-expert
+    env: production

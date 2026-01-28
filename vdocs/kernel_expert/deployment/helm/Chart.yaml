@@ -1,0 +1,24 @@
+apiVersion: v2
+name: kernel-expert
+description: Linux内核专家Agent - 基于源码的智能问答系统
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - linux
+  - kernel
+  - agent
+  - llm
+  - eino
+maintainers:
+  - name: Eino Team
+    email: eino@example.com
+dependencies:
+  - name: redis
+    version: "18.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  - name: postgresql
+    version: "13.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled

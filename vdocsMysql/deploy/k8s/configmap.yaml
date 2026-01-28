@@ -1,0 +1,125 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-expert-agent-config
+  namespace: mysql-expert
+  labels:
+    app.kubernetes.io/name: mysql-expert-agent
+data:
+  config.yaml: |
+    log:
+      level: info
+      format: json
+    
+    source:
+      path: /data/source
+      include_patterns:
+        - "*.cc"
+        - "*.h"
+        - "*.cpp"
+        - "*.hpp"
+      exclude_patterns:
+        - "*/unittest/*"
+        - "*/test/*"
+        - "*/mysql-test/*"
+    
+    index:
+      path: /data/index
+      rebuild_on_start: false
+      parallel_workers: 8
+      batch_size: 1000
+      persistence:
+        persist_on_build: true
+        persist_interval: 30m
+        persist_on_shutdown: true
+        local_path: /data/index
+        recovery_strategy: auto
+    
+    cache:
+      l1:
+        enabled: true
+        max_size: 10000
+        ttl: 5m
+        shard_count: 16
+      l2:
+        enabled: true
+        backend: local
+        ttl: 30m
+        local_path: /data/cache/l2
+      l3:
+        enabled: true
+        db_path: /data/cache/query.db
+        ttl: 24h
+        compression: true
+    
+    storage:
+      primary: sqlite
+      sqlite:
+        path: /data/index/mysql_expert.db
+        max_open_conns: 10
+        max_idle_conns: 5
+        journal_mode: WAL
+        synchronous: NORMAL
+      boltdb:
+        path: /data/index/callgraph.db
+    
+    stats:
+      token:
+        enabled: true
+        count_method: estimate
+        budget_enabled: true
+        daily_budget: 1000000
+        alert_threshold: 0.8
+        persist_enabled: true
+        persist_interval: 5m
+        retention_days: 30
+      cache:
+        enabled: true
+        detail_level: standard
+        report_interval: 5m
+        report_enabled: true
+      prometheus:
+        enabled: true
+        port: 9090
+        path: /metrics
+        namespace: mysql_expert
+    
+    agent:
+      max_iterations: 20
+      max_concurrent_agents: 5
+      timeout: 5m
+      enable_streaming: true
+    
+    output:
+      mode: document
+      include_diagrams: true
+      include_code_refs: true
+      output_dir: /data/output
+    
+    llm:
+      default_provider: openai
+      default_model: gpt-4-turbo
+      routing:
+        enabled: true
+        strategy: smart
+      fallback:
+        enabled: true
+        max_attempts: 3
+    
+    agent_interaction:
+      rest_server:
+        enabled: true
+        address: ":8080"
+        base_path: /api/v1
+        cors:
+          enabled: true
+          allow_origins:
+            - "*"
+          allow_methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+          allow_headers:
+            - Content-Type
+            - Authorization

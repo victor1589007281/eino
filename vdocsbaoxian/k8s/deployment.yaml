@@ -1,0 +1,138 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insurance-expert
+  namespace: insurance-expert
+  labels:
+    app: insurance-expert
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: insurance-expert
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: insurance-expert
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: insurance-expert
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      
+      containers:
+      - name: insurance-expert
+        image: insurance-expert:latest
+        imagePullPolicy: Always
+        
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        
+        env:
+        - name: ZHIPU_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: insurance-expert-secrets
+              key: ZHIPU_API_KEY
+        - name: DEEPSEEK_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: insurance-expert-secrets
+              key: DEEPSEEK_API_KEY
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: insurance-expert-secrets
+              key: OPENAI_API_KEY
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: insurance-expert-secrets
+              key: ANTHROPIC_API_KEY
+        - name: MYSQL_HOST
+          valueFrom:
+            secretKeyRef:
+              name: insurance-expert-secrets
+              key: MYSQL_HOST
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: insurance-expert-secrets
+              key: MYSQL_PASSWORD
+        
+        volumeMounts:
+        - name: config
+          mountPath: /etc/insurance-expert
+          readOnly: true
+        - name: data
+          mountPath: /data
+        
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "2000m"
+            memory: "2Gi"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      
+      volumes:
+      - name: config
+        configMap:
+          name: insurance-expert-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: insurance-expert-data
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: insurance-expert
+  namespace: insurance-expert
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: insurance-expert-data
+  namespace: insurance-expert
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard

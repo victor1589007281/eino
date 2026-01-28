@@ -1,0 +1,124 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mysql-expert-agent.fullname" . }}-config
+  labels:
+    {{- include "mysql-expert-agent.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    log:
+      level: {{ .Values.config.logLevel }}
+      format: json
+    
+    source:
+      path: /data/source
+      include_patterns:
+        - "*.cc"
+        - "*.h"
+        - "*.cpp"
+        - "*.hpp"
+      exclude_patterns:
+        - "*/unittest/*"
+        - "*/test/*"
+        - "*/mysql-test/*"
+    
+    index:
+      path: /data/index
+      rebuild_on_start: {{ .Values.config.index.rebuildOnStart }}
+      parallel_workers: {{ .Values.config.index.parallelWorkers }}
+      batch_size: {{ .Values.config.index.batchSize }}
+      persistence:
+        persist_on_build: true
+        persist_interval: 30m
+        persist_on_shutdown: true
+        local_path: /data/index
+        recovery_strategy: auto
+    
+    cache:
+      l1:
+        enabled: {{ .Values.config.cache.l1.enabled }}
+        max_size: {{ .Values.config.cache.l1.maxSize }}
+        ttl: {{ .Values.config.cache.l1.ttl }}
+        shard_count: 16
+      l2:
+        enabled: {{ .Values.config.cache.l2.enabled }}
+        backend: {{ .Values.config.cache.l2.backend }}
+        ttl: {{ .Values.config.cache.l2.ttl }}
+        local_path: /data/cache/l2
+      l3:
+        enabled: {{ .Values.config.cache.l3.enabled }}
+        db_path: /data/cache/query.db
+        ttl: {{ .Values.config.cache.l3.ttl }}
+        compression: true
+    
+    storage:
+      primary: sqlite
+      sqlite:
+        path: /data/index/mysql_expert.db
+        max_open_conns: 10
+        max_idle_conns: 5
+        journal_mode: WAL
+        synchronous: NORMAL
+      boltdb:
+        path: /data/index/callgraph.db
+    
+    stats:
+      token:
+        enabled: {{ .Values.config.stats.token.enabled }}
+        count_method: estimate
+        budget_enabled: true
+        daily_budget: {{ .Values.config.stats.token.dailyBudget }}
+        alert_threshold: {{ .Values.config.stats.token.alertThreshold }}
+        persist_enabled: true
+        persist_interval: 5m
+        retention_days: 30
+      cache:
+        enabled: {{ .Values.config.stats.cache.enabled }}
+        detail_level: standard
+        report_interval: {{ .Values.config.stats.cache.reportInterval }}
+        report_enabled: true
+      prometheus:
+        enabled: {{ .Values.config.stats.prometheus.enabled }}
+        port: {{ .Values.config.stats.prometheus.port }}
+        path: {{ .Values.config.stats.prometheus.path }}
+        namespace: mysql_expert
+    
+    agent:
+      max_iterations: {{ .Values.config.agent.maxIterations }}
+      max_concurrent_agents: {{ .Values.config.agent.maxConcurrentAgents }}
+      timeout: {{ .Values.config.agent.timeout }}
+      enable_streaming: {{ .Values.config.agent.enableStreaming }}
+    
+    output:
+      mode: document
+      include_diagrams: true
+      include_code_refs: true
+      output_dir: /data/output
+    
+    llm:
+      default_provider: {{ .Values.config.llm.defaultProvider }}
+      default_model: {{ .Values.config.llm.defaultModel }}
+      routing:
+        enabled: {{ .Values.config.llm.routing.enabled }}
+        strategy: {{ .Values.config.llm.routing.strategy }}
+      fallback:
+        enabled: {{ .Values.config.llm.fallback.enabled }}
+        max_attempts: {{ .Values.config.llm.fallback.maxAttempts }}
+    
+    agent_interaction:
+      rest_server:
+        enabled: true
+        address: ":8080"
+        base_path: /api/v1
+        cors:
+          enabled: true
+          allow_origins:
+            - "*"
+          allow_methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+          allow_headers:
+            - Content-Type
+            - Authorization

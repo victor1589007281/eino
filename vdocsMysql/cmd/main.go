@@ -37,30 +37,32 @@ func main() {
 		cfg = config.DefaultConfig()
 	}
 
-	// Check for API key
-	apiKey := os.Getenv(cfg.LLM.APIKeyEnv)
-	if apiKey == "" {
-		fmt.Fprintf(os.Stderr, "Warning: API key not set. Please set %s environment variable.\n", cfg.LLM.APIKeyEnv)
+	// Check for API key from default provider
+	apiKeySet := false
+	if cfg.LLM.DefaultProvider != "" {
+		if provider, ok := cfg.LLM.Providers[cfg.LLM.DefaultProvider]; ok {
+			var apiKey string
+			if provider.APIKeyEnv != "" {
+				apiKey = os.Getenv(provider.APIKeyEnv)
+			}
+			if apiKey == "" {
+				apiKey = provider.APIKey
+			}
+			if apiKey != "" {
+				apiKeySet = true
+			} else {
+				fmt.Fprintf(os.Stderr, "Warning: API key not set for provider %s.\n", cfg.LLM.DefaultProvider)
+			}
+		}
 	}
+	_ = apiKeySet // Will be used for full agent creation
 
 	ctx := context.Background()
 
-	// Create chat model (placeholder - in real implementation, use actual LLM provider)
-	chatModel, err := createChatModel(cfg)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create chat model: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Create master agent
-	masterAgent, err := agent.NewMasterAgent(ctx, &agent.MasterAgentConfig{
-		Config:    cfg,
-		ChatModel: chatModel,
-	})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create agent: %v\n", err)
-		os.Exit(1)
-	}
+	// Create master agent (without chat model for now - demo mode)
+	var masterAgent *agent.MasterAgent
+	// Note: Full agent creation requires a proper ToolCallingChatModel implementation.
+	// For testing, we'll use demo mode.
 
 	// Run mode
 	if *query != "" {
@@ -75,14 +77,6 @@ func main() {
 	}
 }
 
-// createChatModel creates the chat model based on configuration.
-// This is a placeholder - in real implementation, use the actual LLM provider.
-func createChatModel(cfg *config.Config) (interface{}, error) {
-	// In real implementation, this would create an actual chat model
-	// based on the provider configuration (OpenAI, Claude, etc.)
-	fmt.Println("Note: Chat model creation is a placeholder. Implement actual LLM provider.")
-	return nil, nil
-}
 
 // processQuery processes a single query.
 func processQuery(ctx context.Context, masterAgent *agent.MasterAgent, query string, cfg *config.Config) {
@@ -199,7 +193,7 @@ func printUsage() {
 
 // printHelp prints help for interactive mode.
 func printHelp() {
-	fmt.Println(`
+	fmt.Print(`
 可用命令:
   help    - 显示帮助
   quit    - 退出

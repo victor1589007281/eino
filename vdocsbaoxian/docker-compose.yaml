@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  insurance-expert:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: insurance-expert
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - LOG_LEVEL=info
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+    container_name: insurance-demo
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+    stdin_open: true
+    tty: true

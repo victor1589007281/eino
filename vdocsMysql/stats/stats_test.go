@@ -26,8 +26,8 @@ func TestTokenStatsCollector(t *testing.T) {
 		if summary.TotalTokens != 1150 {
 			t.Errorf("Expected 1150 total tokens, got %d", summary.TotalTokens)
 		}
-		if summary.TotalCost != 0.01 {
-			t.Errorf("Expected 0.01 cost, got %f", summary.TotalCost)
+		if summary.TotalCost < 0.009 || summary.TotalCost > 0.011 {
+			t.Errorf("Expected ~0.01 cost, got %f", summary.TotalCost)
 		}
 	})
 

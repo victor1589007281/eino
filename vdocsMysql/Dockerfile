@@ -1,8 +1,8 @@
 # Build stage
 FROM golang:1.22-alpine AS builder
 
-# Install build dependencies
-RUN apk add --no-cache git make gcc musl-dev
+# Install build dependencies (including SQLite dev for CGO)
+RUN apk add --no-cache git make gcc musl-dev sqlite-dev
 
 # Build arguments
 ARG VERSION=dev
@@ -12,18 +12,22 @@ ARG BUILD_TIME=unknown
 # Set working directory
 WORKDIR /app
 
-# Copy go mod files first (for better caching)
-COPY go.mod go.sum ./
-RUN go mod download
+# Copy the entire eino workspace (needed for local module)
+COPY . /workspace
 
-# Copy source code
-COPY . .
+# Change to the vdocsMysql directory
+WORKDIR /workspace/vdocsMysql
 
-# Build the binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+# Build the binary with CGO enabled for SQLite
+RUN CGO_ENABLED=1 GOOS=linux go build \
     -ldflags "-s -w -X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.BuildTime=${BUILD_TIME}" \
     -o /app/bin/mysql-expert-agent \
     ./cmd/main.go
+
+# Build the integration test binary
+RUN CGO_ENABLED=1 GOOS=linux go build \
+    -o /app/bin/test_integration \
+    ./cmd/test_integration/main.go
 
 # Runtime stage
 FROM alpine:3.19
@@ -33,7 +37,8 @@ RUN apk add --no-cache \
     ca-certificates \
     tzdata \
     ripgrep \
-    universal-ctags \
+    ctags \
+    sqlite-libs \
     && rm -rf /var/cache/apk/*
 
 # Create non-root user
@@ -43,15 +48,16 @@ RUN addgroup -g 1000 appuser && \
 # Set working directory
 WORKDIR /app
 
-# Copy binary from builder
+# Copy binaries from builder
 COPY --from=builder /app/bin/mysql-expert-agent /app/
+COPY --from=builder /app/bin/test_integration /app/
 
 # Create necessary directories
 RUN mkdir -p /data/index /data/cache /data/output /data/source && \
     chown -R appuser:appuser /app /data
 
 # Copy default config
-COPY config/config.yaml /app/config/config.yaml
+COPY --from=builder /workspace/vdocsMysql/config/config-dev.yaml /app/config/config.yaml
 
 # Switch to non-root user
 USER appuser
@@ -59,9 +65,10 @@ USER appuser
 # Expose ports
 EXPOSE 8080 9090
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+# Environment variables
+ENV DEEPSEEK_API_KEY=""
+ENV DATA_DIR="/data"
+ENV SOURCE_PATH="/data/source"
 
 # Default command
 ENTRYPOINT ["/app/mysql-expert-agent"]

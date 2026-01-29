@@ -31,8 +31,10 @@ type Config struct {
 	SkillPath  string `json:"skill_path"`  // Skill files path
 
 	// Model configuration
-	ModelProvider string  `json:"model_provider"` // openai, anthropic, etc.
-	ModelName     string  `json:"model_name"`     // gpt-4, claude-3, etc.
+	ModelProvider string  `json:"model_provider"` // openai, anthropic, deepseek, etc.
+	ModelName     string  `json:"model_name"`     // gpt-4, claude-3, deepseek-chat, etc.
+	APIKey        string  `json:"api_key"`        // API key for the model provider
+	BaseURL       string  `json:"base_url"`       // Optional base URL for API endpoint
 	Temperature   float64 `json:"temperature"`
 	MaxTokens     int     `json:"max_tokens"`
 
@@ -57,8 +59,10 @@ func DefaultConfig() *Config {
 		SourcePath:        "/Users/huaquan.liang/Documents/GitHub/linux",
 		IndexPath:         "./index",
 		SkillPath:         "./skills",
-		ModelProvider:     "openai",
-		ModelName:         "gpt-4-turbo",
+		ModelProvider:     "deepseek",
+		ModelName:         "deepseek-chat",
+		APIKey:            os.Getenv("DEEPSEEK_API_KEY"),
+		BaseURL:           "https://api.deepseek.com",
 		Temperature:       0.1,
 		MaxTokens:         4096,
 		MaxIterations:     30,
@@ -117,5 +121,14 @@ func LoadFromEnv(config *Config) {
 	}
 	if v := os.Getenv("MODEL_NAME"); v != "" {
 		config.ModelName = v
+	}
+	if v := os.Getenv("DEEPSEEK_API_KEY"); v != "" {
+		config.APIKey = v
+	}
+	if v := os.Getenv("OPENAI_API_KEY"); v != "" && config.APIKey == "" {
+		config.APIKey = v
+	}
+	if v := os.Getenv("API_BASE_URL"); v != "" {
+		config.BaseURL = v
 	}
 }

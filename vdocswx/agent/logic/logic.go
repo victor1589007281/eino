@@ -47,15 +47,18 @@ func (la *LogicAgent) Process(ctx context.Context, content string, articleType a
 	basicChanges := la.basicLogicCheck(content)
 	result.Changes = append(result.Changes, basicChanges...)
 	
-	// 2. 使用LLM进行深度逻辑分析
-	llmChanges, llmOutput, tokens, err := la.llmLogicOptimize(ctx, content, articleType)
-	if err != nil {
-		result.Output = content
-		result.TokensUsed = 0
+	// 2. 使用LLM进行深度逻辑分析（如果可用）
+	if la.llmManager != nil {
+		llmChanges, llmOutput, tokens, err := la.llmLogicOptimize(ctx, content, articleType)
+		if err == nil {
+			result.Changes = append(result.Changes, llmChanges...)
+			result.Output = llmOutput
+			result.TokensUsed = tokens
+		} else {
+			result.Output = content
+		}
 	} else {
-		result.Changes = append(result.Changes, llmChanges...)
-		result.Output = llmOutput
-		result.TokensUsed = tokens
+		result.Output = content
 	}
 	
 	result.Duration = time.Since(startTime).Milliseconds()
@@ -72,9 +75,6 @@ func (la *LogicAgent) basicLogicCheck(content string) []agent.Change {
 	
 	// 检查因果关系
 	changes = append(changes, la.checkCausality(content)...)
-	
-	// 检查列举完整性
-	changes = append(changes, la.checkEnumeration(content)...)
 	
 	return changes
 }
@@ -128,39 +128,6 @@ func (la *LogicAgent) checkCausality(content string) []agent.Change {
 	return changes
 }
 
-// checkEnumeration 检查列举完整性
-func (la *LogicAgent) checkEnumeration(content string) []agent.Change {
-	changes := make([]agent.Change, 0)
-	
-	// 检查"第一...第二..."序列
-	patterns := []struct {
-		first  string
-		second string
-		third  string
-	}{
-		{"第一", "第二", "第三"},
-		{"首先", "其次", "最后"},
-		{"一是", "二是", "三是"},
-	}
-	
-	for _, p := range patterns {
-		firstCount := strings.Count(content, p.first)
-		secondCount := strings.Count(content, p.second)
-		
-		if firstCount > 0 && secondCount == 0 {
-			changes = append(changes, agent.Change{
-				Type:       agent.ChangeTypeLogic,
-				Original:   "",
-				Modified:   "",
-				Reason:     fmt.Sprintf("发现"%s"但缺少后续"%s"，建议补充完整的列举结构", p.first, p.second),
-				Confidence: 0.65,
-			})
-		}
-	}
-	
-	return changes
-}
-
 // llmLogicOptimize 使用LLM进行逻辑优化
 func (la *LogicAgent) llmLogicOptimize(ctx context.Context, content string, articleType agent.ArticleType) ([]agent.Change, string, int, error) {
 	prompt := la.buildLogicPrompt(content, articleType)
@@ -192,13 +159,10 @@ func (la *LogicAgent) buildLogicPrompt(content string, articleType agent.Article
 4. 是否存在逻辑跳跃或断层
 5. 因果关系是否正确
 6. 列举是否完整有序
-7. 总结是否呼应开头
 
 请按以下格式返回优化建议：
 [问题]: 发现的逻辑问题
-[位置]: 问题所在位置（段落或句子）
 [建议]: 优化建议
-[修改]: 如果需要具体修改，提供修改后的文本
 
 如果逻辑结构良好，请返回"逻辑清晰，无需调整"。
 
@@ -209,51 +173,37 @@ func (la *LogicAgent) buildLogicPrompt(content string, articleType agent.Article
 // parseLLMResult 解析LLM返回结果
 func (la *LogicAgent) parseLLMResult(original, result string) ([]agent.Change, string) {
 	changes := make([]agent.Change, 0)
-	optimized := original
 	
 	if strings.Contains(result, "无需调整") || strings.Contains(result, "逻辑清晰") {
 		return changes, original
 	}
 	
 	lines := strings.Split(result, "\n")
-	var currentProblem, currentLocation, currentSuggestion, currentModification string
+	var currentProblem, currentSuggestion string
 	
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "[问题]:") || strings.HasPrefix(line, "[问题]：") {
 			currentProblem = strings.TrimPrefix(strings.TrimPrefix(line, "[问题]:"), "[问题]：")
 			currentProblem = strings.TrimSpace(currentProblem)
-		} else if strings.HasPrefix(line, "[位置]:") || strings.HasPrefix(line, "[位置]：") {
-			currentLocation = strings.TrimPrefix(strings.TrimPrefix(line, "[位置]:"), "[位置]：")
-			currentLocation = strings.TrimSpace(currentLocation)
 		} else if strings.HasPrefix(line, "[建议]:") || strings.HasPrefix(line, "[建议]：") {
 			currentSuggestion = strings.TrimPrefix(strings.TrimPrefix(line, "[建议]:"), "[建议]：")
 			currentSuggestion = strings.TrimSpace(currentSuggestion)
-		} else if strings.HasPrefix(line, "[修改]:") || strings.HasPrefix(line, "[修改]：") {
-			currentModification = strings.TrimPrefix(strings.TrimPrefix(line, "[修改]:"), "[修改]：")
-			currentModification = strings.TrimSpace(currentModification)
 			
-			// 记录修改
-			reason := currentProblem
-			if currentSuggestion != "" {
-				reason = fmt.Sprintf("%s - %s", currentProblem, currentSuggestion)
+			if currentProblem != "" {
+				changes = append(changes, agent.Change{
+					Type:       agent.ChangeTypeLogic,
+					Original:   "",
+					Modified:   "",
+					Reason:     fmt.Sprintf("%s - %s", currentProblem, currentSuggestion),
+					Confidence: 0.75,
+				})
 			}
 			
-			changes = append(changes, agent.Change{
-				Type:       agent.ChangeTypeLogic,
-				Original:   currentLocation,
-				Modified:   currentModification,
-				Reason:     reason,
-				Confidence: 0.75,
-			})
-			
-			// 重置
 			currentProblem = ""
-			currentLocation = ""
 			currentSuggestion = ""
-			currentModification = ""
 		}
 	}
 	
-	return changes, optimized
+	return changes, original
 }

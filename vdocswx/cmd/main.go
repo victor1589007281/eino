@@ -194,8 +194,12 @@ func runPolish(cfg *config.Config, inputPath, outputPath string) {
 	if len(result.Changes) > 0 {
 		log.Println("\n修改详情:")
 		for i, change := range result.Changes {
-			log.Printf("%d. [%s] %s -> %s (%s)",
-				i+1, change.Type, change.Original, change.Modified, change.Reason)
+			if change.Original != "" {
+				log.Printf("%d. [%s] %s -> %s (%s)",
+					i+1, change.Type, change.Original, change.Modified, change.Reason)
+			} else {
+				log.Printf("%d. [%s] 建议: %s", i+1, change.Type, change.Reason)
+			}
 		}
 	}
 }
@@ -226,7 +230,13 @@ func runInit(cfg *config.Config) {
 	}
 
 	// 初始化数据库
-	db, err := storage.NewSQLiteStorage(cfg.Storage.LocalDBPath + "/vdocswx.db")
+	dbPath := cfg.Storage.LocalDBPath
+	if dbPath == "" {
+		dbPath = "./data"
+	}
+	os.MkdirAll(dbPath, 0755)
+	
+	db, err := storage.NewSQLiteStorage(dbPath + "/vdocswx.db")
 	if err != nil {
 		log.Fatalf("初始化数据库失败: %v", err)
 	}
@@ -234,11 +244,13 @@ func runInit(cfg *config.Config) {
 	log.Println("数据库初始化完成")
 
 	// 加载技能
-	skillLoader := skills.NewSkillLoader(cfg.Skills.Directory)
-	if err := skillLoader.LoadAll(ctx); err != nil {
-		log.Printf("加载技能失败: %v", err)
-	} else {
-		log.Printf("加载技能: %d 个", len(skillLoader.GetAllSkills()))
+	if cfg.Skills.Directory != "" {
+		skillLoader := skills.NewSkillLoader(cfg.Skills.Directory)
+		if err := skillLoader.LoadAll(ctx); err != nil {
+			log.Printf("加载技能失败: %v", err)
+		} else {
+			log.Printf("加载技能: %d 个", len(skillLoader.GetAllSkills()))
+		}
 	}
 
 	log.Println("系统初始化完成！")
@@ -271,8 +283,14 @@ func initializeApp(ctx context.Context, cfg *config.Config) (*App, error) {
 	app.statsCollector = stats.NewCollector(&cfg.Stats)
 
 	// 初始化存储
+	dbPath := cfg.Storage.LocalDBPath
+	if dbPath == "" {
+		dbPath = "./data"
+	}
+	os.MkdirAll(dbPath, 0755)
+	
 	var err error
-	app.storage, err = storage.NewSQLiteStorage(cfg.Storage.LocalDBPath + "/vdocswx.db")
+	app.storage, err = storage.NewSQLiteStorage(dbPath + "/vdocswx.db")
 	if err != nil {
 		return nil, fmt.Errorf("初始化存储失败: %w", err)
 	}
@@ -289,13 +307,16 @@ func initializeApp(ctx context.Context, cfg *config.Config) (*App, error) {
 	// 初始化LLM管理器
 	app.llmManager, err = llm.NewLLMManager(&cfg.LLM)
 	if err != nil {
-		return nil, fmt.Errorf("初始化LLM管理器失败: %w", err)
+		log.Printf("初始化LLM管理器警告: %v (将使用规则引擎模式)", err)
+		app.llmManager = nil
 	}
 
 	// 初始化技能加载器
-	app.skillLoader = skills.NewSkillLoader(cfg.Skills.Directory)
-	if err := app.skillLoader.LoadAll(ctx); err != nil {
-		log.Printf("加载技能警告: %v", err)
+	if cfg.Skills.Directory != "" {
+		app.skillLoader = skills.NewSkillLoader(cfg.Skills.Directory)
+		if err := app.skillLoader.LoadAll(ctx); err != nil {
+			log.Printf("加载技能警告: %v", err)
+		}
 	}
 
 	// 初始化子Agent

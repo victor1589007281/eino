@@ -11,6 +11,7 @@ import (
 	"github.com/cloudwego/eino/adk/prebuilt/supervisor"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/compose"
 
 	"github.com/cloudwego/eino/vdocsMysql/config"
 	"github.com/cloudwego/eino/vdocsMysql/tools"
@@ -70,7 +71,7 @@ func NewMasterAgent(ctx context.Context, cfg *MasterAgentConfig) (*MasterAgent, 
 		Instruction: masterAgentInstruction,
 		Model:       cfg.ChatModel,
 		ToolsConfig: adk.ToolsConfig{
-			ToolsNodeConfig: adk.ToolsNodeConfig{
+			ToolsNodeConfig: compose.ToolsNodeConfig{
 				Tools: []tool.BaseTool{grepTool, symbolTool},
 			},
 		},
@@ -113,7 +114,7 @@ func (ma *MasterAgent) createCodeSearchAgent(ctx context.Context, grepTool, symb
 		Instruction: codeSearchAgentInstruction,
 		Model:       ma.chatModel,
 		ToolsConfig: adk.ToolsConfig{
-			ToolsNodeConfig: adk.ToolsNodeConfig{
+			ToolsNodeConfig: compose.ToolsNodeConfig{
 				Tools: []tool.BaseTool{grepTool, symbolTool},
 			},
 		},
@@ -134,7 +135,7 @@ func (ma *MasterAgent) createFunctionAnalyzerAgent(ctx context.Context) (adk.Age
 		Instruction: functionAnalyzerInstruction,
 		Model:       ma.chatModel,
 		ToolsConfig: adk.ToolsConfig{
-			ToolsNodeConfig: adk.ToolsNodeConfig{
+			ToolsNodeConfig: compose.ToolsNodeConfig{
 				Tools: []tool.BaseTool{grepTool},
 			},
 		},

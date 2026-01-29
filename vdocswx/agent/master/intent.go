@@ -65,18 +65,27 @@ func (ir *IntentRecognizer) initPatterns() {
 
 // Recognize 识别用户意图
 func (ir *IntentRecognizer) Recognize(ctx context.Context, userInput, articleContent string) *agent.Intent {
+	// 如果没有用户输入，默认为润色
+	if userInput == "" {
+		return &agent.Intent{
+			Type:       agent.IntentTypePolish,
+			Confidence: 1.0,
+			RawQuery:   "",
+		}
+	}
+	
 	// 首先尝试规则匹配
 	intent := ir.ruleBasedRecognition(userInput)
 	if intent.Confidence >= 0.8 {
 		return intent
 	}
 	
-	// 规则匹配置信度不足时，使用LLM增强
-	llmIntent := ir.llmBasedRecognition(ctx, userInput, articleContent)
-	
-	// 合并结果，取置信度高的
-	if llmIntent.Confidence > intent.Confidence {
-		return llmIntent
+	// 规则匹配置信度不足时，如果有LLM则使用LLM增强
+	if ir.llmManager != nil {
+		llmIntent := ir.llmBasedRecognition(ctx, userInput, articleContent)
+		if llmIntent.Confidence > intent.Confidence {
+			return llmIntent
+		}
 	}
 	
 	return intent

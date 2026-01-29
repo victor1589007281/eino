@@ -1,0 +1,49 @@
+# Build stage
+FROM golang:1.22-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache gcc musl-dev
+
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+
+# Copy the entire eino module for replace directive
+COPY ../go.mod ../go.sum /eino/
+COPY ../*.go /eino/
+COPY ../adk /eino/adk
+COPY ../schema /eino/schema
+COPY ../components /eino/components
+COPY ../compose /eino/compose
+COPY ../callbacks /eino/callbacks
+COPY ../utils /eino/utils
+COPY ../internal /eino/internal
+COPY ../flow /eino/flow
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the demo binary
+RUN CGO_ENABLED=1 GOOS=linux go build -o /insurance-demo ./cmd/demo/
+
+# Runtime stage
+FROM alpine:latest
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+# Copy binary from builder
+COPY --from=builder /insurance-demo /app/
+
+# Create data directory
+RUN mkdir -p /data
+
+# Set environment
+ENV TZ=Asia/Shanghai
+
+ENTRYPOINT ["/app/insurance-demo"]

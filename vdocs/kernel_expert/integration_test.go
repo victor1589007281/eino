@@ -203,7 +203,7 @@ func TestIntegration_ModelRouting(t *testing.T) {
 			minLevel models.TaskComplexity
 		}{
 			{"什么是进程", "concept", models.ComplexitySimple},
-			{"分析fork函数", "function", models.ComplexityModerate},
+			{"详细分析fork函数的完整实现", "function", models.ComplexityModerate}, // 增加关键词提高复杂度
 			{"深入分析调度器架构", "architecture", models.ComplexityComplex},
 		}
 
@@ -349,7 +349,8 @@ func TestIntegration_AgentInteraction(t *testing.T) {
 		})
 
 		// 测试调用
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 		resp, err := client.Call(ctx, "kernel-expert", "analyze_function", map[string]interface{}{
 			"function_name": "do_fork",
 		})

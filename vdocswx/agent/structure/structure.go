@@ -19,19 +19,19 @@ type StructureAgent struct {
 
 // ArticleStructure 文章结构
 type ArticleStructure struct {
-	Title       string
-	Sections    []Section
-	HasIntro    bool
+	Title         string
+	Sections      []Section
+	HasIntro      bool
 	HasConclusion bool
-	TotalWords  int
+	TotalWords    int
 }
 
 // Section 章节
 type Section struct {
-	Level    int
-	Title    string
-	Content  string
-	Words    int
+	Level       int
+	Title       string
+	Content     string
+	Words       int
 	SubSections []Section
 }
 
@@ -69,15 +69,18 @@ func (sa *StructureAgent) Process(ctx context.Context, content string, articleTy
 	basicChanges := sa.basicStructureCheck(structure, articleType)
 	result.Changes = append(result.Changes, basicChanges...)
 	
-	// 3. 使用LLM进行深度结构分析
-	llmChanges, llmOutput, tokens, err := sa.llmStructureOptimize(ctx, content, structure, articleType)
-	if err != nil {
-		result.Output = content
-		result.TokensUsed = 0
+	// 3. 使用LLM进行深度结构分析（如果可用）
+	if sa.llmManager != nil {
+		llmChanges, llmOutput, tokens, err := sa.llmStructureOptimize(ctx, content, structure, articleType)
+		if err == nil {
+			result.Changes = append(result.Changes, llmChanges...)
+			result.Output = llmOutput
+			result.TokensUsed = tokens
+		} else {
+			result.Output = content
+		}
 	} else {
-		result.Changes = append(result.Changes, llmChanges...)
-		result.Output = llmOutput
-		result.TokensUsed = tokens
+		result.Output = content
 	}
 	
 	result.Duration = time.Since(startTime).Milliseconds()
@@ -97,7 +100,6 @@ func (sa *StructureAgent) parseStructure(content string) *ArticleStructure {
 	// 标题正则
 	h1Pattern := regexp.MustCompile(`^#\s+(.+)$`)
 	h2Pattern := regexp.MustCompile(`^##\s+(.+)$`)
-	h3Pattern := regexp.MustCompile(`^###\s+(.+)$`)
 	
 	var currentSection *Section
 	var contentBuilder strings.Builder
@@ -118,15 +120,8 @@ func (sa *StructureAgent) parseStructure(content string) *ArticleStructure {
 				Title: match[1],
 			}
 			contentBuilder.Reset()
-		} else if match := h3Pattern.FindStringSubmatch(line); len(match) > 1 {
-			if currentSection != nil {
-				currentSection.SubSections = append(currentSection.SubSections, Section{
-					Level: 3,
-					Title: match[1],
-				})
-			}
 		} else {
-			if i == 1 && structure.Title == "" {
+			if i == 0 && structure.Title == "" {
 				// 第一行可能是标题（非markdown格式）
 				trimmed := strings.TrimSpace(line)
 				if len(trimmed) > 0 && len(trimmed) < 100 {
@@ -197,54 +192,6 @@ func (sa *StructureAgent) basicStructureCheck(structure *ArticleStructure, artic
 		})
 	}
 	
-	// 检查章节长度均衡性
-	if len(structure.Sections) >= 3 {
-		var maxWords, minWords int
-		maxWords = structure.Sections[0].Words
-		minWords = structure.Sections[0].Words
-		
-		for _, section := range structure.Sections {
-			if section.Words > maxWords {
-				maxWords = section.Words
-			}
-			if section.Words < minWords {
-				minWords = section.Words
-			}
-		}
-		
-		if maxWords > 0 && minWords > 0 && float64(maxWords)/float64(minWords) > 5 {
-			changes = append(changes, agent.Change{
-				Type:       agent.ChangeTypeStructure,
-				Original:   "",
-				Modified:   "",
-				Reason:     "章节长度差异较大，建议调整各章节篇幅，使结构更加均衡",
-				Confidence: 0.7,
-			})
-		}
-	}
-	
-	// 技术文章特殊检查
-	if articleType == agent.ArticleTypeTech {
-		// 检查是否有代码示例章节
-		hasCodeSection := false
-		for _, section := range structure.Sections {
-			if strings.Contains(section.Title, "代码") || strings.Contains(section.Title, "示例") || strings.Contains(section.Title, "实现") {
-				hasCodeSection = true
-				break
-			}
-		}
-		
-		if !hasCodeSection && structure.TotalWords > 500 {
-			changes = append(changes, agent.Change{
-				Type:       agent.ChangeTypeStructure,
-				Original:   "",
-				Modified:   "",
-				Reason:     "技术文章建议包含代码示例或实现章节，便于读者理解和实践",
-				Confidence: 0.6,
-			})
-		}
-	}
-	
 	// 检查引言和结语
 	if structure.TotalWords > 500 && !structure.HasIntro {
 		changes = append(changes, agent.Change{
@@ -311,12 +258,10 @@ func (sa *StructureAgent) buildStructurePrompt(content string, structure *Articl
 3. 正文分3-5个小节为宜
 4. 每节300-500字，段落短小
 5. 有清晰的过渡和总结
-6. 技术文章应包含：背景、原理、实现、总结
 
 请分析并提供优化建议：
 [问题]: 发现的结构问题
 [建议]: 具体的优化建议
-[新结构]: 如果需要重构，提供建议的新大纲
 
 如果结构良好，请返回"结构合理，无需调整"。
 
@@ -360,22 +305,4 @@ func (sa *StructureAgent) parseLLMResult(original, result string) ([]agent.Chang
 	}
 	
 	return changes, original
-}
-
-// GenerateOutline 生成文章大纲
-func (sa *StructureAgent) GenerateOutline(ctx context.Context, topic string, articleType agent.ArticleType) (string, error) {
-	prompt := fmt.Sprintf(`请为以下主题生成一个适合微信公众号的文章大纲：
-
-主题：%s
-文章类型：%s
-
-要求：
-1. 标题吸引人
-2. 3-5个主要章节
-3. 每个章节下可以有2-3个小点
-4. 包含引言和总结
-
-请使用Markdown格式输出大纲。`, topic, articleType)
-	
-	return sa.llmManager.GenerateText(ctx, prompt, "outline")
 }

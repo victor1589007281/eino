@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  mysql-expert-agent:
+    build:
+      context: ..
+      dockerfile: vdocsMysql/Dockerfile
+    container_name: mysql-expert-agent
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DATA_DIR=/data
+      - SOURCE_PATH=/data/source
+    volumes:
+      # Mount the percona-server source code
+      - ${SOURCE_PATH:-/Users/huaquan.liang/Documents/GitHub/percona-server}:/data/source:ro
+      # Persistent data storage
+      - mysql-expert-data:/data/index
+      - mysql-expert-cache:/data/cache
+      - mysql-expert-output:/data/output
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # Integration test runner
+  test-runner:
+    build:
+      context: ..
+      dockerfile: vdocsMysql/Dockerfile
+    container_name: mysql-expert-test
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DATA_DIR=/data
+      - SOURCE_PATH=/data/source
+    volumes:
+      - ${SOURCE_PATH:-/Users/huaquan.liang/Documents/GitHub/percona-server}:/data/source:ro
+      - mysql-expert-test-data:/data/index
+    entrypoint: ["/app/test_integration"]
+    profiles:
+      - test
+
+volumes:
+  mysql-expert-data:
+  mysql-expert-cache:
+  mysql-expert-output:
+  mysql-expert-test-data:

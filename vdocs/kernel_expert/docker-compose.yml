@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  kernel-expert:
+    build:
+      context: ../..
+      dockerfile: vdocs/kernel_expert/Dockerfile
+    image: kernel-expert:latest
+    container_name: kernel-expert
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - KERNEL_SOURCE_PATH=/linux
+      - KERNEL_INDEX_PATH=/app/index
+    volumes:
+      # 挂载Linux内核源码 (只读)
+      - ${LINUX_SOURCE_PATH:-/Users/huaquan.liang/Documents/GitHub/linux}:/linux:ro
+      # 持久化索引和缓存
+      - kernel-index:/app/index
+      - kernel-cache:/app/cache
+      - kernel-logs:/app/logs
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  kernel-index:
+  kernel-cache:
+  kernel-logs:

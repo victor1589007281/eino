@@ -1,23 +1,21 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.22-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git make gcc musl-dev
 
-WORKDIR /app
+WORKDIR /build
 
-# Copy go mod files
-COPY go.mod go.sum ./
+# First, copy the entire eino project for the replace directive
+COPY . /build/eino
+
+WORKDIR /build/eino/vdocsbaoxian
 
 # Download dependencies
 RUN go mod download
 
-# Copy source code
-COPY . .
-
-# Build
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
-    go build -ldflags "-s -w" -o bin/insurance-expert ./cmd/main.go
+# Build the demo binary (use native architecture)
+RUN CGO_ENABLED=1 go build -ldflags "-s -w" -o /insurance-demo ./cmd/demo/
 
 # Runtime stage
 FROM alpine:3.19
@@ -32,27 +30,16 @@ ENV TZ=Asia/Shanghai
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 # Create directories
-RUN mkdir -p /app/bin /data/index /data/cache /data/output /etc/insurance-expert && \
-    chown -R appuser:appgroup /app /data /etc/insurance-expert
+RUN mkdir -p /app /data && \
+    chown -R appuser:appgroup /app /data
 
 WORKDIR /app
 
 # Copy binary
-COPY --from=builder /app/bin/insurance-expert /app/bin/
-
-# Copy default config
-COPY config.yaml /etc/insurance-expert/config.yaml
+COPY --from=builder /insurance-demo /app/
 
 # Switch to non-root user
 USER appuser
 
-# Expose ports
-EXPOSE 8080 9090
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
-
 # Entry point
-ENTRYPOINT ["/app/bin/insurance-expert"]
-CMD ["serve", "--config=/etc/insurance-expert/config.yaml"]
+ENTRYPOINT ["/app/insurance-demo"]

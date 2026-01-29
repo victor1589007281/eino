@@ -7,14 +7,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudwego/eino/adk"
-	"github.com/cloudwego/eino/schema"
 	"github.com/cloudwego/eino/vdocswx/agent"
 	"github.com/cloudwego/eino/vdocswx/cache"
 	"github.com/cloudwego/eino/vdocswx/config"
 	"github.com/cloudwego/eino/vdocswx/llm"
 	"github.com/cloudwego/eino/vdocswx/stats"
 )
+
+// Message 消息
+type Message struct {
+	Role    string
+	Content string
+}
 
 // MasterAgent 主Agent实现
 type MasterAgent struct {
@@ -31,7 +35,7 @@ type MasterAgent struct {
 // Session 会话状态
 type Session struct {
 	ID           string
-	History      []*schema.Message
+	History      []*Message
 	CurrentDraft string
 	Changes      []agent.Change
 	CreatedAt    time.Time
@@ -70,16 +74,18 @@ func (ma *MasterAgent) Polish(ctx context.Context, input *agent.ArticleInput) (*
 	
 	// 1. 检查缓存
 	cacheKey := ma.generateCacheKey(input)
-	if cached, ok := ma.cache.Get(ctx, cacheKey); ok {
-		if result, ok := cached.(*agent.PolishResult); ok {
-			ma.stats.RecordCacheHit("polish_result")
-			return result, nil
+	if ma.cache != nil {
+		if cached, ok := ma.cache.Get(ctx, cacheKey); ok {
+			if result, ok := cached.(*agent.PolishResult); ok {
+				ma.stats.RecordCacheHit("polish_result")
+				return result, nil
+			}
 		}
+		ma.stats.RecordCacheMiss("polish_result")
 	}
-	ma.stats.RecordCacheMiss("polish_result")
 	
 	// 2. 识别文章类型
-	if input.Type == agent.ArticleTypeUnknown {
+	if input.Type == agent.ArticleTypeUnknown || input.Type == "" {
 		input.Type = ma.detectArticleType(ctx, input.Content)
 	}
 	
@@ -99,7 +105,9 @@ func (ma *MasterAgent) Polish(ctx context.Context, input *agent.ArticleInput) (*
 	result.Statistics.ProcessingTime = time.Since(startTime).Milliseconds()
 	
 	// 7. 缓存结果
-	ma.cache.Set(ctx, cacheKey, result)
+	if ma.cache != nil {
+		ma.cache.Set(ctx, cacheKey, result)
+	}
 	
 	return result, nil
 }
@@ -256,7 +264,7 @@ func (ma *MasterAgent) Chat(ctx context.Context, sessionID string, message strin
 	defer session.mu.Unlock()
 	
 	// 添加用户消息
-	session.History = append(session.History, schema.UserMessage(message))
+	session.History = append(session.History, &Message{Role: "user", Content: message})
 	
 	// 识别意图
 	intent := ma.intentRecog.Recognize(ctx, message, session.CurrentDraft)
@@ -311,14 +319,14 @@ func (ma *MasterAgent) Chat(ctx context.Context, sessionID string, message strin
 	}
 	
 	// 添加助手回复
-	session.History = append(session.History, schema.AssistantMessage(response.Message, nil))
+	session.History = append(session.History, &Message{Role: "assistant", Content: response.Message})
 	session.UpdatedAt = time.Now()
 	
 	return response, nil
 }
 
 // GetHistory 获取会话历史
-func (ma *MasterAgent) GetHistory(ctx context.Context, sessionID string) ([]*schema.Message, error) {
+func (ma *MasterAgent) GetHistory(ctx context.Context, sessionID string) ([]*Message, error) {
 	if session, ok := ma.sessions.Load(sessionID); ok {
 		s := session.(*Session)
 		s.mu.RLock()
@@ -326,6 +334,15 @@ func (ma *MasterAgent) GetHistory(ctx context.Context, sessionID string) ([]*sch
 		return s.History, nil
 	}
 	return nil, fmt.Errorf("session %s not found", sessionID)
+}
+
+// SetSessionDraft 设置会话草稿
+func (ma *MasterAgent) SetSessionDraft(sessionID, draft string) {
+	session := ma.getOrCreateSession(sessionID)
+	session.mu.Lock()
+	defer session.mu.Unlock()
+	session.CurrentDraft = draft
+	session.UpdatedAt = time.Now()
 }
 
 // getOrCreateSession 获取或创建会话
@@ -336,7 +353,7 @@ func (ma *MasterAgent) getOrCreateSession(sessionID string) *Session {
 	
 	session := &Session{
 		ID:        sessionID,
-		History:   make([]*schema.Message, 0),
+		History:   make([]*Message, 0),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -371,7 +388,9 @@ func (ma *MasterAgent) applyChanges(original string, changes []agent.Change) str
 	// 简单实现：按顺序应用修改
 	result := original
 	for _, change := range changes {
-		result = replaceFirst(result, change.Original, change.Modified)
+		if change.Original != "" && change.Modified != "" {
+			result = replaceFirst(result, change.Original, change.Modified)
+		}
 	}
 	return result
 }
@@ -400,6 +419,10 @@ func (ma *MasterAgent) calculateStatistics(original, polished string, changes []
 
 // answerQuestion 回答用户问题
 func (ma *MasterAgent) answerQuestion(ctx context.Context, question, content string) (string, error) {
+	if ma.llmManager == nil {
+		return "抱歉，LLM服务不可用", nil
+	}
+	
 	prompt := fmt.Sprintf(`基于以下文章内容，回答用户的问题：
 
 文章内容：
@@ -415,7 +438,12 @@ func (ma *MasterAgent) answerQuestion(ctx context.Context, question, content str
 // 辅助函数
 
 func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsString(s[1:], substr) || s[:len(substr)] == substr)
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 func hashString(s string) string {

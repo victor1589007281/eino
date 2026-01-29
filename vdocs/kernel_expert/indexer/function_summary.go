@@ -26,16 +26,16 @@ import (
 
 // FunctionSummaryDB provides fast function information lookup.
 type FunctionSummaryDB struct {
-	functions map[string][]*FunctionInfo // name -> list of functions
-	byFile    map[string][]*FunctionInfo // file -> list of functions
+	Functions map[string][]*FunctionInfo // name -> list of functions (exported for gob)
+	ByFile    map[string][]*FunctionInfo // file -> list of functions (exported for gob)
 	mu        sync.RWMutex
 }
 
 // NewFunctionSummaryDB creates a new function summary database.
 func NewFunctionSummaryDB() *FunctionSummaryDB {
 	return &FunctionSummaryDB{
-		functions: make(map[string][]*FunctionInfo),
-		byFile:    make(map[string][]*FunctionInfo),
+		Functions: make(map[string][]*FunctionInfo),
+		ByFile:    make(map[string][]*FunctionInfo),
 	}
 }
 
@@ -44,15 +44,15 @@ func (db *FunctionSummaryDB) AddFunction(info *FunctionInfo) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
-	db.functions[info.Name] = append(db.functions[info.Name], info)
-	db.byFile[info.File] = append(db.byFile[info.File], info)
+	db.Functions[info.Name] = append(db.Functions[info.Name], info)
+	db.ByFile[info.File] = append(db.ByFile[info.File], info)
 }
 
 // GetFunction returns function information by name.
 func (db *FunctionSummaryDB) GetFunction(name string) []*FunctionInfo {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
-	return db.functions[name]
+	return db.Functions[name]
 }
 
 // GetFunctionByFile returns function information by name and file.
@@ -60,7 +60,7 @@ func (db *FunctionSummaryDB) GetFunctionByFile(name, file string) *FunctionInfo 
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
-	funcs := db.functions[name]
+	funcs := db.Functions[name]
 	for _, f := range funcs {
 		if f.File == file {
 			return f
@@ -73,7 +73,7 @@ func (db *FunctionSummaryDB) GetFunctionByFile(name, file string) *FunctionInfo 
 func (db *FunctionSummaryDB) GetFunctionsInFile(file string) []*FunctionInfo {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
-	return db.byFile[file]
+	return db.ByFile[file]
 }
 
 // SearchFunctions searches for functions by name pattern.
@@ -85,7 +85,7 @@ func (db *FunctionSummaryDB) SearchFunctions(pattern string, limit int) []*Funct
 	if err != nil {
 		// Treat as prefix search
 		results := make([]*FunctionInfo, 0, limit)
-		for name, funcs := range db.functions {
+		for name, funcs := range db.Functions {
 			if strings.HasPrefix(name, pattern) {
 				results = append(results, funcs...)
 				if len(results) >= limit {
@@ -97,7 +97,7 @@ func (db *FunctionSummaryDB) SearchFunctions(pattern string, limit int) []*Funct
 	}
 
 	results := make([]*FunctionInfo, 0, limit)
-	for name, funcs := range db.functions {
+	for name, funcs := range db.Functions {
 		if re.MatchString(name) {
 			results = append(results, funcs...)
 			if len(results) >= limit {
@@ -114,10 +114,10 @@ func (db *FunctionSummaryDB) GetStats() (funcCount, fileCount int) {
 	defer db.mu.RUnlock()
 
 	totalFuncs := 0
-	for _, funcs := range db.functions {
+	for _, funcs := range db.Functions {
 		totalFuncs += len(funcs)
 	}
-	return totalFuncs, len(db.byFile)
+	return totalFuncs, len(db.ByFile)
 }
 
 // ParseCTagsFile parses a ctags output file.
@@ -234,18 +234,18 @@ func ctagsKindToSymbolKind(kind string) SymbolKind {
 
 // SymbolTable provides symbol lookup.
 type SymbolTable struct {
-	symbols map[string][]*Symbol // name -> symbols
-	byFile  map[string][]*Symbol // file -> symbols
-	byKind  map[SymbolKind][]*Symbol
+	Symbols map[string][]*Symbol      // name -> symbols (exported for gob)
+	ByFile  map[string][]*Symbol      // file -> symbols (exported for gob)
+	ByKind  map[SymbolKind][]*Symbol  // kind -> symbols (exported for gob)
 	mu      sync.RWMutex
 }
 
 // NewSymbolTable creates a new symbol table.
 func NewSymbolTable() *SymbolTable {
 	return &SymbolTable{
-		symbols: make(map[string][]*Symbol),
-		byFile:  make(map[string][]*Symbol),
-		byKind:  make(map[SymbolKind][]*Symbol),
+		Symbols: make(map[string][]*Symbol),
+		ByFile:  make(map[string][]*Symbol),
+		ByKind:  make(map[SymbolKind][]*Symbol),
 	}
 }
 
@@ -254,30 +254,30 @@ func (st *SymbolTable) AddSymbol(symbol *Symbol) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 
-	st.symbols[symbol.Name] = append(st.symbols[symbol.Name], symbol)
-	st.byFile[symbol.File] = append(st.byFile[symbol.File], symbol)
-	st.byKind[symbol.Kind] = append(st.byKind[symbol.Kind], symbol)
+	st.Symbols[symbol.Name] = append(st.Symbols[symbol.Name], symbol)
+	st.ByFile[symbol.File] = append(st.ByFile[symbol.File], symbol)
+	st.ByKind[symbol.Kind] = append(st.ByKind[symbol.Kind], symbol)
 }
 
 // GetSymbol returns symbols by name.
 func (st *SymbolTable) GetSymbol(name string) []*Symbol {
 	st.mu.RLock()
 	defer st.mu.RUnlock()
-	return st.symbols[name]
+	return st.Symbols[name]
 }
 
 // GetSymbolsByFile returns symbols in a file.
 func (st *SymbolTable) GetSymbolsByFile(file string) []*Symbol {
 	st.mu.RLock()
 	defer st.mu.RUnlock()
-	return st.byFile[file]
+	return st.ByFile[file]
 }
 
 // GetSymbolsByKind returns symbols of a specific kind.
 func (st *SymbolTable) GetSymbolsByKind(kind SymbolKind) []*Symbol {
 	st.mu.RLock()
 	defer st.mu.RUnlock()
-	return st.byKind[kind]
+	return st.ByKind[kind]
 }
 
 // SearchSymbols searches for symbols by name pattern.
@@ -291,7 +291,7 @@ func (st *SymbolTable) SearchSymbols(pattern string, kind SymbolKind, limit int)
 	}
 
 	results := make([]*Symbol, 0, limit)
-	for name, syms := range st.symbols {
+	for name, syms := range st.Symbols {
 		if re.MatchString(name) {
 			for _, sym := range syms {
 				if kind == "" || sym.Kind == kind {
@@ -312,7 +312,7 @@ func (st *SymbolTable) GetStats() (total int, byKind map[SymbolKind]int) {
 	defer st.mu.RUnlock()
 
 	byKind = make(map[SymbolKind]int)
-	for kind, syms := range st.byKind {
+	for kind, syms := range st.ByKind {
 		byKind[kind] = len(syms)
 		total += len(syms)
 	}

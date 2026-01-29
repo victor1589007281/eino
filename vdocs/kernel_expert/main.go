@@ -30,6 +30,7 @@ import (
 
 	"kernel_expert/agent"
 	"kernel_expert/indexer"
+	"kernel_expert/llm"
 	"kernel_expert/output"
 )
 
@@ -97,21 +98,43 @@ func main() {
 }
 
 // createChatModel creates the chat model based on environment configuration.
-// In a real implementation, this would use eino-ext model implementations.
 func createChatModel() model.ToolCallingChatModel {
-	// Check for API keys
-	if os.Getenv("OPENAI_API_KEY") != "" {
-		fmt.Println("Using OpenAI model (configure in production)")
-		// In real usage:
-		// return openai.NewChatModel(ctx, &openai.Config{...})
-		return nil
+	// Check for DeepSeek API key first
+	if apiKey := os.Getenv("DEEPSEEK_API_KEY"); apiKey != "" {
+		fmt.Println("Using DeepSeek model...")
+		m, err := llm.NewDeepSeekModel(&llm.DeepSeekConfig{
+			APIKey: apiKey,
+		})
+		if err != nil {
+			fmt.Printf("Warning: Failed to create DeepSeek model: %v\n", err)
+			return nil
+		}
+		return m
 	}
-	if os.Getenv("ANTHROPIC_API_KEY") != "" {
-		fmt.Println("Using Anthropic model (configure in production)")
-		// In real usage:
-		// return anthropic.NewChatModel(ctx, &anthropic.Config{...})
-		return nil
+
+	// Check for OpenAI API key (can also use for DeepSeek with custom base URL)
+	if apiKey := os.Getenv("OPENAI_API_KEY"); apiKey != "" {
+		baseURL := os.Getenv("OPENAI_BASE_URL")
+		if baseURL == "" {
+			baseURL = "https://api.openai.com/v1"
+		}
+		modelName := os.Getenv("OPENAI_MODEL")
+		if modelName == "" {
+			modelName = "gpt-4-turbo"
+		}
+		fmt.Printf("Using OpenAI-compatible model: %s\n", modelName)
+		m, err := llm.NewDeepSeekModel(&llm.DeepSeekConfig{
+			APIKey:  apiKey,
+			BaseURL: baseURL,
+			Model:   modelName,
+		})
+		if err != nil {
+			fmt.Printf("Warning: Failed to create model: %v\n", err)
+			return nil
+		}
+		return m
 	}
+
 	return nil
 }
 

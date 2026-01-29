@@ -50,9 +50,6 @@ func (s *Server) Start(addr string) error {
 	mux.HandleFunc("/api/v1/stats", s.handleStats)
 	mux.HandleFunc("/api/v1/history", s.handleHistory)
 
-	// 静态文件（如果需要）
-	mux.Handle("/", http.FileServer(http.Dir("./static")))
-
 	s.httpServer = &http.Server{
 		Addr:         addr,
 		Handler:      s.withMiddleware(mux),
@@ -112,10 +109,10 @@ type PolishRequest struct {
 
 // PolishResponse 润色响应
 type PolishResponse struct {
-	PolishedContent string            `json:"polished_content"`
-	Changes         []agent.Change    `json:"changes"`
+	PolishedContent string             `json:"polished_content"`
+	Changes         []agent.Change     `json:"changes"`
 	Suggestions     []agent.Suggestion `json:"suggestions"`
-	Statistics      agent.Statistics  `json:"statistics"`
+	Statistics      agent.Statistics   `json:"statistics"`
 }
 
 // handlePolish 处理润色请求
@@ -203,6 +200,11 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	// 生成会话ID
 	if req.SessionID == "" {
 		req.SessionID = fmt.Sprintf("session_%d", time.Now().UnixNano())
+	}
+
+	// 如果提供了草稿，设置到会话
+	if req.Draft != "" {
+		s.masterAgent.SetSessionDraft(req.SessionID, req.Draft)
 	}
 
 	// 执行对话
@@ -305,14 +307,14 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 
 	response := map[string]interface{}{
 		"tokens": map[string]interface{}{
-			"total":     totalTokens,
-			"by_model":  llmTokens,
+			"total":    totalTokens,
+			"by_model": llmTokens,
 		},
 		"cache": map[string]interface{}{
-			"hits":       hits,
-			"misses":     misses,
-			"evictions":  evictions,
-			"hit_rates":  cacheHitRates,
+			"hits":      hits,
+			"misses":    misses,
+			"evictions": evictions,
+			"hit_rates": cacheHitRates,
 		},
 	}
 

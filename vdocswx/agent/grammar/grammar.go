@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/cloudwego/eino/vdocswx/agent"
 	"github.com/cloudwego/eino/vdocswx/llm"
@@ -40,18 +39,6 @@ func NewGrammarAgent(llmMgr *llm.LLMManager) *GrammarAgent {
 func (ga *GrammarAgent) initRules() {
 	ga.rules = []GrammarRule{
 		// 标点符号规则
-		{
-			Name:        "chinese_period",
-			Pattern:     regexp.MustCompile(`([^a-zA-Z0-9])\.$`),
-			Replacement: "$1。",
-			Description: "使用中文句号",
-		},
-		{
-			Name:        "chinese_comma",
-			Pattern:     regexp.MustCompile(`([^a-zA-Z0-9]),([^a-zA-Z0-9])`),
-			Replacement: "$1，$2",
-			Description: "使用中文逗号",
-		},
 		{
 			Name:        "double_punctuation",
 			Pattern:     regexp.MustCompile(`([。，！？]){2,}`),
@@ -106,16 +93,22 @@ func (ga *GrammarAgent) Process(ctx context.Context, content string, articleType
 	ruleChanges, ruleOutput := ga.applyRules(content)
 	result.Changes = append(result.Changes, ruleChanges...)
 	
-	// 2. 使用LLM进行深度语法检查
-	llmChanges, llmOutput, tokens, err := ga.llmGrammarCheck(ctx, ruleOutput, articleType)
-	if err != nil {
-		// LLM检查失败时仍返回规则检查结果
-		result.Output = ruleOutput
-		result.TokensUsed = 0
+	// 2. 检查常见错误
+	commonErrors := ga.CheckCommonErrors(ruleOutput)
+	result.Changes = append(result.Changes, commonErrors...)
+	
+	// 3. 使用LLM进行深度语法检查（如果可用）
+	if ga.llmManager != nil {
+		llmChanges, llmOutput, tokens, err := ga.llmGrammarCheck(ctx, ruleOutput, articleType)
+		if err == nil {
+			result.Changes = append(result.Changes, llmChanges...)
+			result.Output = llmOutput
+			result.TokensUsed = tokens
+		} else {
+			result.Output = ruleOutput
+		}
 	} else {
-		result.Changes = append(result.Changes, llmChanges...)
-		result.Output = llmOutput
-		result.TokensUsed = tokens
+		result.Output = ruleOutput
 	}
 	
 	result.Duration = time.Since(startTime).Milliseconds()
@@ -129,21 +122,17 @@ func (ga *GrammarAgent) applyRules(content string) ([]agent.Change, string) {
 	result := content
 	
 	for _, rule := range ga.rules {
-		matches := rule.Pattern.FindAllStringSubmatchIndex(result, -1)
+		matches := rule.Pattern.FindAllString(result, -1)
 		for _, match := range matches {
-			if len(match) >= 2 {
-				original := result[match[0]:match[1]]
-				modified := rule.Pattern.ReplaceAllString(original, rule.Replacement)
-				
-				if original != modified {
-					changes = append(changes, agent.Change{
-						Type:       agent.ChangeTypeGrammar,
-						Original:   original,
-						Modified:   modified,
-						Reason:     rule.Description,
-						Confidence: 0.95,
-					})
-				}
+			modified := rule.Pattern.ReplaceAllString(match, rule.Replacement)
+			if match != modified {
+				changes = append(changes, agent.Change{
+					Type:       agent.ChangeTypeGrammar,
+					Original:   match,
+					Modified:   modified,
+					Reason:     rule.Description,
+					Confidence: 0.95,
+				})
 			}
 		}
 		result = rule.Pattern.ReplaceAllString(result, rule.Replacement)
@@ -165,10 +154,6 @@ func (ga *GrammarAgent) checkPunctuation(content string) (string, []agent.Change
 	result, quoteChanges := ga.checkQuotePairs(result)
 	changes = append(changes, quoteChanges...)
 	
-	// 检查括号配对
-	result, bracketChanges := ga.checkBracketPairs(result)
-	changes = append(changes, bracketChanges...)
-	
 	return result, changes
 }
 
@@ -188,36 +173,6 @@ func (ga *GrammarAgent) checkQuotePairs(content string) (string, []agent.Change)
 			Reason:     fmt.Sprintf("引号不匹配：左引号%d个，右引号%d个", leftQuote, rightQuote),
 			Confidence: 0.8,
 		})
-	}
-	
-	return content, changes
-}
-
-// checkBracketPairs 检查括号配对
-func (ga *GrammarAgent) checkBracketPairs(content string) (string, []agent.Change) {
-	changes := make([]agent.Change, 0)
-	
-	brackets := map[rune]rune{
-		'（': '）',
-		'(': ')',
-		'[': ']',
-		'【': '】',
-		'{': '}',
-	}
-	
-	for left, right := range brackets {
-		leftCount := strings.Count(content, string(left))
-		rightCount := strings.Count(content, string(right))
-		
-		if leftCount != rightCount {
-			changes = append(changes, agent.Change{
-				Type:       agent.ChangeTypePunctuation,
-				Original:   "",
-				Modified:   "",
-				Reason:     fmt.Sprintf("括号%c和%c不匹配", left, right),
-				Confidence: 0.8,
-			})
-		}
 	}
 	
 	return content, changes
@@ -329,7 +284,6 @@ func (ga *GrammarAgent) CheckCommonErrors(content string) []agent.Change {
 		"即时": "及时",
 		"做为": "作为",
 		"象是": "像是",
-		"在于": "在于",
 	}
 	
 	for wrong, correct := range commonErrors {

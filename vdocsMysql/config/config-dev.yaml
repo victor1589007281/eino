@@ -1,0 +1,169 @@
+# MySQL Expert Agent - Development Configuration
+
+log:
+  level: debug
+  format: text
+
+source:
+  path: /Users/huaquan.liang/Documents/GitHub/percona-server
+  include_patterns:
+    - "*.cc"
+    - "*.h"
+    - "*.cpp"
+    - "*.hpp"
+  exclude_patterns:
+    - "*/unittest/*"
+    - "*/test/*"
+    - "*/mysql-test/*"
+    - "*/boost/*"
+    - "*/extra/*"
+
+index:
+  path: /Users/huaquan.liang/Documents/GitHub/eino/vdocsMysql/data/index
+  rebuild_on_start: false
+  parallel_workers: 8
+  batch_size: 1000
+  update_interval: 1h
+  persistence:
+    persist_on_build: true
+    persist_interval: 30m
+    persist_on_shutdown: true
+    local_path: /Users/huaquan.liang/Documents/GitHub/eino/vdocsMysql/data/index
+    recovery_strategy: auto
+
+cache:
+  l1:
+    enabled: true
+    max_size: 10000
+    max_memory: 104857600  # 100MB
+    ttl: 5m
+    shard_count: 16
+  l2:
+    enabled: true
+    backend: local
+    ttl: 30m
+    local_path: /Users/huaquan.liang/Documents/GitHub/eino/vdocsMysql/data/cache
+  l3:
+    enabled: true
+    db_path: /Users/huaquan.liang/Documents/GitHub/eino/vdocsMysql/data/cache/query.db
+    ttl: 24h
+    max_size_bytes: 1073741824  # 1GB
+    compression: true
+
+storage:
+  primary: sqlite
+  sqlite:
+    path: /Users/huaquan.liang/Documents/GitHub/eino/vdocsMysql/data/index/mysql_expert.db
+    max_open_conns: 10
+    max_idle_conns: 5
+    conn_max_lifetime: 1h
+    journal_mode: WAL
+    synchronous: NORMAL
+  boltdb:
+    path: /Users/huaquan.liang/Documents/GitHub/eino/vdocsMysql/data/index/callgraph.db
+
+stats:
+  token:
+    enabled: true
+    count_method: estimate
+    budget_enabled: true
+    daily_budget: 1000000
+    session_budget: 100000
+    alert_threshold: 0.8
+    persist_enabled: true
+    persist_interval: 5m
+    retention_days: 30
+  cache:
+    enabled: true
+    detail_level: detailed
+    report_interval: 1m
+    report_enabled: true
+  prometheus:
+    enabled: false
+    port: 9090
+    path: /metrics
+    namespace: mysql_expert
+
+agent:
+  max_iterations: 20
+  max_concurrent_agents: 5
+  timeout: 5m
+  enable_streaming: true
+
+output:
+  mode: document
+  include_diagrams: true
+  include_code_refs: true
+  output_dir: /Users/huaquan.liang/Documents/GitHub/eino/vdocsMysql/output
+
+llm:
+  default_provider: deepseek
+  default_model: deepseek-chat
+  providers:
+    deepseek:
+      name: DeepSeek
+      type: openai  # DeepSeek uses OpenAI-compatible API
+      enabled: true
+      priority: 1
+      base_url: https://api.deepseek.com/v1
+      api_key_env: DEEPSEEK_API_KEY
+      timeout: 120s
+      max_retries: 3
+      retry_delay: 1s
+      models:
+        deepseek-chat:
+          name: deepseek-chat
+          display_name: DeepSeek Chat
+          enabled: true
+          max_context_length: 64000
+          max_output_length: 4096
+          temperature: 0.7
+          input_cost_per_1k: 0.0001
+          output_cost_per_1k: 0.0002
+        deepseek-coder:
+          name: deepseek-coder
+          display_name: DeepSeek Coder
+          enabled: true
+          max_context_length: 64000
+          max_output_length: 4096
+          temperature: 0.3
+          input_cost_per_1k: 0.0001
+          output_cost_per_1k: 0.0002
+  routing:
+    enabled: true
+    strategy: simple
+    scene_mapping:
+      code_search:
+        preferred:
+          - deepseek-coder
+        fallback:
+          - deepseek-chat
+      analysis:
+        preferred:
+          - deepseek-chat
+  fallback:
+    enabled: true
+    max_attempts: 3
+    delay_between_attempts: 2s
+    fallback_chain:
+      - deepseek-chat
+
+agent_interaction:
+  rest_server:
+    enabled: true
+    address: ":8080"
+    base_path: /api/v1
+    cors:
+      enabled: true
+      allow_origins:
+        - "*"
+      allow_methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+      allow_headers:
+        - Content-Type
+        - Authorization
+      allow_credentials: false
+      max_age: 3600

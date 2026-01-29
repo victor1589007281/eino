@@ -59,19 +59,6 @@ func (sa *StyleAgent) initGuidelines() {
 					return true, ""
 				},
 			},
-			{
-				Name:        "title_hook",
-				Description: "标题应具有吸引力",
-				Check: func(title string) (bool, string) {
-					hooks := []string{"如何", "为什么", "揭秘", "必看", "干货", "实战", "最全", "深度"}
-					for _, hook := range hooks {
-						if strings.Contains(title, hook) {
-							return true, ""
-						}
-					}
-					return false, "建议标题增加吸引力元素，如'如何'、'揭秘'、'干货'等"
-				},
-			},
 		},
 		ParagraphRules: []StyleRule{
 			{
@@ -81,29 +68,6 @@ func (sa *StyleAgent) initGuidelines() {
 					length := len([]rune(paragraph))
 					if length > 300 {
 						return false, "段落过长，建议拆分以提高可读性"
-					}
-					return true, ""
-				},
-			},
-			{
-				Name:        "sentence_variety",
-				Description: "句式应多样化",
-				Check: func(paragraph string) (bool, string) {
-					// 简单检查是否都是相同句式开头
-					sentences := strings.Split(paragraph, "。")
-					if len(sentences) >= 3 {
-						firstChars := make(map[rune]int)
-						for _, s := range sentences {
-							s = strings.TrimSpace(s)
-							if len(s) > 0 {
-								firstChars[[]rune(s)[0]]++
-							}
-						}
-						for _, count := range firstChars {
-							if count >= 3 {
-								return false, "句式开头较为单一，建议增加变化"
-							}
-						}
 					}
 					return true, ""
 				},
@@ -122,18 +86,6 @@ func (sa *StyleAgent) initGuidelines() {
 					}
 					return true, ""
 				},
-			},
-		},
-		FormattingRules: []StyleRule{
-			{
-				Name:        "emoji_usage",
-				Description: "适当使用表情符号增加亲和力",
-				// 检查逻辑在具体方法中实现
-			},
-			{
-				Name:        "subheading",
-				Description: "长文应有小标题分隔",
-				// 检查逻辑在具体方法中实现
 			},
 		},
 	}
@@ -163,15 +115,18 @@ func (sa *StyleAgent) Process(ctx context.Context, content string, articleType a
 	ruleChanges := sa.applyRules(content, articleType)
 	result.Changes = append(result.Changes, ruleChanges...)
 	
-	// 2. 使用LLM进行深度风格优化
-	llmChanges, llmOutput, tokens, err := sa.llmStyleOptimize(ctx, content, articleType)
-	if err != nil {
-		result.Output = content
-		result.TokensUsed = 0
+	// 2. 使用LLM进行深度风格优化（如果可用）
+	if sa.llmManager != nil {
+		llmChanges, llmOutput, tokens, err := sa.llmStyleOptimize(ctx, content, articleType)
+		if err == nil {
+			result.Changes = append(result.Changes, llmChanges...)
+			result.Output = llmOutput
+			result.TokensUsed = tokens
+		} else {
+			result.Output = content
+		}
 	} else {
-		result.Changes = append(result.Changes, llmChanges...)
-		result.Output = llmOutput
-		result.TokensUsed = tokens
+		result.Output = content
 	}
 	
 	result.Duration = time.Since(startTime).Milliseconds()
@@ -200,22 +155,6 @@ func (sa *StyleAgent) applyRules(content string, articleType agent.ArticleType) 
 		}
 	}
 	
-	// 检查段落
-	paragraphs := sa.extractParagraphs(content)
-	for _, para := range paragraphs {
-		for _, rule := range sa.guidelines.ParagraphRules {
-			if ok, suggestion := rule.Check(para); !ok {
-				changes = append(changes, agent.Change{
-					Type:       agent.ChangeTypeStyle,
-					Original:   para[:min(50, len(para))] + "...",
-					Modified:   "",
-					Reason:     suggestion,
-					Confidence: 0.7,
-				})
-			}
-		}
-	}
-	
 	// 检查语气
 	for _, rule := range sa.guidelines.ToneRules {
 		if ok, suggestion := rule.Check(content); !ok {
@@ -233,34 +172,6 @@ func (sa *StyleAgent) applyRules(content string, articleType agent.ArticleType) 
 	changes = append(changes, sa.checkFormatting(content, articleType)...)
 	
 	return changes
-}
-
-// extractParagraphs 提取段落
-func (sa *StyleAgent) extractParagraphs(content string) []string {
-	paragraphs := make([]string, 0)
-	lines := strings.Split(content, "\n")
-	
-	var currentPara strings.Builder
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			if currentPara.Len() > 0 {
-				paragraphs = append(paragraphs, currentPara.String())
-				currentPara.Reset()
-			}
-		} else if !strings.HasPrefix(line, "#") && !strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "```") {
-			if currentPara.Len() > 0 {
-				currentPara.WriteString(" ")
-			}
-			currentPara.WriteString(line)
-		}
-	}
-	
-	if currentPara.Len() > 0 {
-		paragraphs = append(paragraphs, currentPara.String())
-	}
-	
-	return paragraphs
 }
 
 // checkFormatting 检查格式
@@ -281,18 +192,6 @@ func (sa *StyleAgent) checkFormatting(content string, articleType agent.ArticleT
 		})
 	}
 	
-	// 检查是否过度使用emoji
-	emojiCount := sa.countEmojis(content)
-	if emojiCount > contentLength/200 {
-		changes = append(changes, agent.Change{
-			Type:       agent.ChangeTypeStyle,
-			Original:   "",
-			Modified:   "",
-			Reason:     "表情符号使用较多，建议适度使用",
-			Confidence: 0.6,
-		})
-	}
-	
 	// 技术文章特殊检查
 	if articleType == agent.ArticleTypeTech {
 		// 检查是否有代码块
@@ -308,21 +207,6 @@ func (sa *StyleAgent) checkFormatting(content string, articleType agent.ArticleT
 	}
 	
 	return changes
-}
-
-// countEmojis 统计emoji数量
-func (sa *StyleAgent) countEmojis(content string) int {
-	count := 0
-	for _, r := range content {
-		if r >= 0x1F600 && r <= 0x1F64F || // Emoticons
-			r >= 0x1F300 && r <= 0x1F5FF || // Misc Symbols and Pictographs
-			r >= 0x1F680 && r <= 0x1F6FF || // Transport and Map
-			r >= 0x2600 && r <= 0x26FF || // Misc symbols
-			r >= 0x2700 && r <= 0x27BF { // Dingbats
-			count++
-		}
-	}
-	return count
 }
 
 // llmStyleOptimize 使用LLM进行风格优化
@@ -411,11 +295,4 @@ func (sa *StyleAgent) parseLLMResult(original, result string) ([]agent.Change, s
 	}
 	
 	return changes, optimized
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

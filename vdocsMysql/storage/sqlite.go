@@ -13,8 +13,9 @@ import (
 
 // SQLiteStorage implements Storage interface using SQLite.
 type SQLiteStorage struct {
-	db     *sql.DB
-	dbPath string
+	db            *sql.DB
+	dbPath        string
+	fts5Available bool
 }
 
 // SQLiteConfig contains SQLite configuration.
@@ -55,7 +56,8 @@ func NewSQLiteStorage(config *SQLiteConfig) (*SQLiteStorage, error) {
 
 // Init initializes the database schema.
 func (s *SQLiteStorage) Init(ctx context.Context) error {
-	schema := `
+	// Base schema without FTS5
+	baseSchema := `
 	-- Documents table
 	CREATE TABLE IF NOT EXISTS documents (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -118,6 +120,21 @@ func (s *SQLiteStorage) Init(ctx context.Context) error {
 	CREATE INDEX IF NOT EXISTS idx_functions_file ON function_summaries(file_path);
 	CREATE INDEX IF NOT EXISTS idx_functions_module ON function_summaries(module);
 
+	-- Metadata table for storage stats
+	CREATE TABLE IF NOT EXISTS storage_metadata (
+		key TEXT PRIMARY KEY,
+		value TEXT,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+	`
+
+	_, err := s.db.ExecContext(ctx, baseSchema)
+	if err != nil {
+		return fmt.Errorf("failed to create base schema: %w", err)
+	}
+
+	// Try to create FTS5 tables (optional - degrades gracefully if not available)
+	fts5Schema := `
 	-- Function FTS for full-text search
 	CREATE VIRTUAL TABLE IF NOT EXISTS function_fts USING fts5(
 		name, qualified_name, signature, description, tags,
@@ -142,19 +159,11 @@ func (s *SQLiteStorage) Init(ctx context.Context) error {
 		INSERT INTO function_fts(rowid, name, qualified_name, signature, description, tags)
 		VALUES (NEW.rowid, NEW.name, NEW.qualified_name, NEW.signature, NEW.description, NEW.tags);
 	END;
-
-	-- Metadata table for storage stats
-	CREATE TABLE IF NOT EXISTS storage_metadata (
-		key TEXT PRIMARY KEY,
-		value TEXT,
-		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	);
 	`
 
-	_, err := s.db.ExecContext(ctx, schema)
-	if err != nil {
-		return fmt.Errorf("failed to create schema: %w", err)
-	}
+	// Try FTS5, but don't fail if not available
+	_, ftsErr := s.db.ExecContext(ctx, fts5Schema)
+	s.fts5Available = ftsErr == nil
 
 	return nil
 }

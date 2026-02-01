@@ -1,0 +1,138 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ocr-agent-config
+  namespace: ocr-agent
+  labels:
+    app: ocr-agent
+data:
+  config.yaml: |
+    # OCR Agent Configuration for Kubernetes
+    server:
+      host: "0.0.0.0"
+      port: 8080
+      read_timeout: 30s
+      write_timeout: 120s
+      max_body_size: 104857600  # 100MB
+
+    llm:
+      default_provider: "deepseek"
+      temperature: 0.1
+      max_tokens: 4096
+      
+      providers:
+        deepseek:
+          type: "deepseek"
+          enabled: true
+          base_url: "https://api.deepseek.com"
+          model: "deepseek-chat"
+          max_tokens: 4096
+          timeout: 60s
+          rate_limit: 100
+        
+        qwen:
+          type: "qwen"
+          enabled: false
+          base_url: "https://dashscope.aliyuncs.com/api/v1"
+          model: "qwen-max"
+          max_tokens: 8192
+          timeout: 60s
+          rate_limit: 50
+      
+      retry:
+        max_retries: 3
+        initial_delay: 1s
+        max_delay: 30s
+        multiplier: 2.0
+
+    ocr:
+      engine: "tesseract"
+      language: "chi_sim+eng"
+      tesseract_path: "/usr/bin/tesseract"
+      max_concurrency: 4
+      timeout: 120s
+      
+      image:
+        max_width: 4096
+        max_height: 4096
+        max_file_size: 52428800
+        supported_types:
+          - "jpg"
+          - "jpeg"
+          - "png"
+          - "gif"
+          - "bmp"
+          - "tiff"
+          - "webp"
+        preprocessing: true
+        dpi: 300
+      
+      pdf:
+        max_pages: 100
+        max_file_size: 104857600
+        dpi: 300
+        extract_images: true
+        extract_text: true
+        ocr_scanned_pdf: true
+        page_range: "all"
+      
+      invoice:
+        types:
+          - "vat_invoice"
+          - "vat_special_invoice"
+          - "receipt"
+          - "taxi_receipt"
+          - "train_ticket"
+          - "air_ticket"
+          - "hotel_invoice"
+          - "toll_invoice"
+        auto_classify: true
+        extract_fields:
+          - "invoice_code"
+          - "invoice_number"
+          - "invoice_date"
+          - "check_code"
+          - "buyer_name"
+          - "buyer_tax_id"
+          - "seller_name"
+          - "seller_tax_id"
+          - "amount"
+          - "tax_amount"
+          - "total_amount"
+          - "items"
+        validate: false
+
+    storage:
+      type: "sqlite"
+      data_dir: "/data"
+      max_open_conns: 10
+      max_idle_conns: 5
+      conn_max_lifetime: 30m
+
+    cache:
+      enabled: true
+      type: "memory"
+      l1_size: 100
+      l2_size: 1000
+      ttl: 1h
+
+    output:
+      format: "json"
+      include_raw: false
+      include_images: false
+      output_dir: "/data/output"
+
+    logging:
+      level: "info"
+      format: "json"
+      output: "stdout"
+      max_size: 100
+      max_backups: 3
+      max_age: 7
+      compress: true
+
+    telemetry:
+      enabled: true
+      metrics_port: 9090
+      tracing_type: "jaeger"
+      tracing_url: "http://jaeger-collector.monitoring:14268/api/traces"

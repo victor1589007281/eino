@@ -1,0 +1,188 @@
+# OCR Agent Configuration
+# 用于识别和提取图片、PDF、发票等文档信息的智能Agent配置
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: 30s
+  write_timeout: 60s
+  max_body_size: 104857600  # 100MB
+
+llm:
+  default_provider: "deepseek"
+  temperature: 0.1
+  max_tokens: 4096
+  
+  providers:
+    deepseek:
+      type: "deepseek"
+      enabled: true
+      # api_key: ${DEEPSEEK_API_KEY}  # 从环境变量读取
+      base_url: "https://api.deepseek.com"
+      model: "deepseek-chat"
+      max_tokens: 4096
+      timeout: 60s
+      rate_limit: 100
+    
+    qwen:
+      type: "qwen"
+      enabled: false
+      # api_key: ${QWEN_API_KEY}
+      base_url: "https://dashscope.aliyuncs.com/api/v1"
+      model: "qwen-max"
+      max_tokens: 8192
+      timeout: 60s
+      rate_limit: 50
+    
+    openai:
+      type: "openai"
+      enabled: false
+      # api_key: ${OPENAI_API_KEY}
+      base_url: "https://api.openai.com/v1"
+      model: "gpt-4o"
+      max_tokens: 4096
+      timeout: 120s
+      rate_limit: 60
+    
+    anthropic:
+      type: "anthropic"
+      enabled: false
+      # api_key: ${ANTHROPIC_API_KEY}
+      base_url: "https://api.anthropic.com"
+      model: "claude-3-5-sonnet-20241022"
+      max_tokens: 8192
+      timeout: 120s
+      rate_limit: 50
+  
+  retry:
+    max_retries: 3
+    initial_delay: 1s
+    max_delay: 30s
+    multiplier: 2.0
+
+ocr:
+  # OCR引擎: tesseract, paddleocr, api
+  engine: "tesseract"
+  language: "chi_sim+eng"
+  tesseract_path: "/usr/bin/tesseract"
+  paddle_model_path: ""
+  max_concurrency: 4
+  timeout: 120s
+  
+  image:
+    max_width: 4096
+    max_height: 4096
+    max_file_size: 52428800  # 50MB
+    supported_types:
+      - "jpg"
+      - "jpeg"
+      - "png"
+      - "gif"
+      - "bmp"
+      - "tiff"
+      - "webp"
+    preprocessing: true
+    dpi: 300
+  
+  pdf:
+    max_pages: 100
+    max_file_size: 104857600  # 100MB
+    dpi: 300
+    extract_images: true
+    extract_text: true
+    ocr_scanned_pdf: true
+    page_range: "all"
+  
+  invoice:
+    types:
+      - "vat_invoice"          # 增值税发票
+      - "vat_special_invoice"  # 增值税专用发票
+      - "receipt"              # 收据
+      - "taxi_receipt"         # 出租车发票
+      - "train_ticket"         # 火车票
+      - "air_ticket"           # 机票
+      - "hotel_invoice"        # 酒店发票
+      - "toll_invoice"         # 过路费发票
+    auto_classify: true
+    extract_fields:
+      - "invoice_code"      # 发票代码
+      - "invoice_number"    # 发票号码
+      - "invoice_date"      # 开票日期
+      - "check_code"        # 校验码
+      - "buyer_name"        # 购买方名称
+      - "buyer_tax_id"      # 购买方纳税人识别号
+      - "seller_name"       # 销售方名称
+      - "seller_tax_id"     # 销售方纳税人识别号
+      - "amount"            # 金额
+      - "tax_amount"        # 税额
+      - "total_amount"      # 价税合计
+      - "items"             # 商品明细
+    validate: false
+  
+  api_providers:
+    baidu:
+      enabled: false
+      provider: "baidu"
+      # api_key: ${BAIDU_OCR_API_KEY}
+      # secret_key: ${BAIDU_OCR_SECRET_KEY}
+      endpoint: "https://aip.baidubce.com"
+    
+    tencent:
+      enabled: false
+      provider: "tencent"
+      # api_key: ${TENCENT_OCR_SECRET_ID}
+      # secret_key: ${TENCENT_OCR_SECRET_KEY}
+      region: "ap-shanghai"
+    
+    aliyun:
+      enabled: false
+      provider: "aliyun"
+      # api_key: ${ALIYUN_ACCESS_KEY_ID}
+      # secret_key: ${ALIYUN_ACCESS_KEY_SECRET}
+      endpoint: "https://ocr.cn-shanghai.aliyuncs.com"
+
+storage:
+  type: "sqlite"
+  dsn: ""
+  data_dir: "./data"
+  max_open_conns: 10
+  max_idle_conns: 5
+  conn_max_lifetime: 30m
+
+cache:
+  enabled: true
+  type: "memory"
+  l1_size: 100
+  l2_size: 1000
+  ttl: 1h
+  
+  # Redis配置 (当type为redis时使用)
+  redis:
+    addresses:
+      - "localhost:6379"
+    password: ""
+    db: 0
+    pool_size: 10
+
+output:
+  format: "json"           # json, markdown, html
+  include_raw: false       # 是否包含原始OCR文本
+  include_images: false    # 是否包含提取的图片
+  output_dir: "./output"
+  template: ""             # 自定义输出模板路径
+
+logging:
+  level: "info"           # debug, info, warn, error
+  format: "json"          # json, text
+  output: "stdout"        # stdout, file
+  file_path: "./logs/ocr-agent.log"
+  max_size: 100           # MB
+  max_backups: 3
+  max_age: 7              # days
+  compress: true
+
+telemetry:
+  enabled: false
+  metrics_port: 9090
+  tracing_type: "jaeger"
+  tracing_url: "http://localhost:14268/api/traces"

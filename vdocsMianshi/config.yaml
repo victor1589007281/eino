@@ -1,0 +1,128 @@
+# Interview Expert Agent 配置文件
+# 详细配置说明请参考 README.md
+
+log:
+  level: info
+  format: json
+  output: stdout
+
+agent:
+  max_iterations: 30
+  max_concurrent_agents: 5
+  timeout: 10m
+  enable_streaming: true
+
+llm:
+  default_provider: zhipu
+  default_model: glm-4
+  providers:
+    zhipu:
+      name: 智谱AI
+      type: zhipu
+      enabled: true
+      priority: 1
+      base_url: https://open.bigmodel.cn/api/paas/v4
+      api_key_env: ZHIPU_API_KEY
+      model: glm-4
+      timeout: 120s
+      max_retries: 3
+    
+    deepseek:
+      name: DeepSeek
+      type: deepseek
+      enabled: true
+      priority: 2
+      base_url: https://api.deepseek.com/v1
+      api_key_env: DEEPSEEK_API_KEY
+      model: deepseek-chat
+      timeout: 120s
+      max_retries: 3
+    
+    openai:
+      name: OpenAI
+      type: openai
+      enabled: true
+      priority: 3
+      base_url: https://api.openai.com/v1
+      api_key_env: OPENAI_API_KEY
+      model: gpt-4-turbo
+      timeout: 120s
+      max_retries: 3
+    
+    ollama:
+      name: Ollama
+      type: ollama
+      enabled: true
+      priority: 10
+      base_url: http://localhost:11434
+      model: llama3
+      timeout: 300s
+
+interview:
+  default_duration_minutes: 60
+  max_questions: 20
+  skill_categories:
+    - programming
+    - framework
+    - database
+    - system_design
+    - algorithm
+    - soft_skills
+    - leadership
+  difficulty_weights:
+    basic: 1.0
+    intermediate: 1.5
+    advanced: 2.0
+    expert: 2.5
+  enable_adaptive: true
+  adaptive_config:
+    min_questions: 5
+    max_questions: 15
+    confidence_threshold: 0.8
+    difficulty_adjust: true
+  scoring:
+    pass_threshold: 0.6
+    weight_by_difficulty: true
+    round_weights:
+      screening: 0.15
+      technical: 0.40
+      behavioral: 0.20
+      system_design: 0.25
+
+output:
+  mode: detailed
+  include_diagrams: true
+  diagram_style: mermaid
+  output_dir: ./output
+  report_format: markdown
+
+storage:
+  type: sqlite
+  path: ./data/interview.db
+  cache_ttl: 24h
+
+interaction:
+  rest_server:
+    enabled: true
+    address: ":8080"
+    base_path: /api/v1
+    cors:
+      enabled: true
+      allow_origins:
+        - "*"
+      allow_methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+      allow_headers:
+        - Content-Type
+        - Authorization
+  
+  mcp_server:
+    enabled: true
+    name: interview-expert
+    version: "1.0.0"
+    description: Interview Expert Agent MCP Server
+    transport: stdio

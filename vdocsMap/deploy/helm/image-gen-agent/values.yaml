@@ -1,0 +1,191 @@
+# 默认配置值
+# 可以通过 --set 或 -f values-override.yaml 覆盖
+
+# 副本数
+replicaCount: 2
+
+# 镜像配置
+image:
+  repository: image-gen-agent
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# 服务账户
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod 注解
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/metrics"
+
+# Pod 安全上下文
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# 容器安全上下文
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# 服务配置
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# Ingress 配置
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+  hosts:
+    - host: image-gen.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: image-gen-agent-tls
+      hosts:
+        - image-gen.example.com
+
+# 资源限制
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# 自动扩缩容
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# 节点选择器
+nodeSelector: {}
+
+# 容忍度
+tolerations: []
+
+# 亲和性
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: image-gen-agent
+          topologyKey: kubernetes.io/hostname
+
+# 存储配置
+persistence:
+  data:
+    enabled: true
+    size: 10Gi
+    storageClass: "standard"
+    accessMode: ReadWriteOnce
+  output:
+    enabled: true
+    size: 50Gi
+    storageClass: "standard"
+    accessMode: ReadWriteMany
+
+# 应用配置
+config:
+  server:
+    host: "0.0.0.0"
+    port: 8080
+    mode: "release"
+  
+  llm:
+    provider: "openai"
+    model: "gpt-4o"
+    maxTokens: 4096
+    temperature: 0.7
+    timeout: 60
+  
+  image:
+    staticImage:
+      provider: "dalle"
+      model: "dall-e-3"
+      defaultSize: "1024x1024"
+      quality: "standard"
+    animatedGif:
+      provider: "stable_video"
+      defaultFps: 24
+      maxDuration: 10
+      defaultSize: "768x768"
+    sticker:
+      provider: "dalle"
+      defaultSize: "512x512"
+      withText: true
+      textPosition: "bottom"
+    output:
+      directory: "/data/output"
+      maxFileSize: 10485760
+      format: "png"
+  
+  agent:
+    name: "image-gen-agent"
+    maxIterations: 10
+    retryCount: 3
+    retryDelay: 1000
+    enabledTools:
+      - "generate_image"
+      - "generate_gif"
+      - "generate_sticker"
+      - "optimize_prompt"
+      - "analyze_style"
+  
+  logging:
+    level: "info"
+    format: "json"
+    outputPath: "stdout"
+
+# 密钥配置（建议使用外部 Secret 管理）
+secrets:
+  openaiApiKey: ""
+  stabilityApiKey: ""
+  arkApiKey: ""
+  qwenApiKey: ""
+  deepseekApiKey: ""
+
+# 健康检查
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3

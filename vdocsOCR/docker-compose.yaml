@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  ocr-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ocr-agent:latest
+    container_name: ocr-agent
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - QWEN_API_KEY=${QWEN_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - BAIDU_OCR_API_KEY=${BAIDU_OCR_API_KEY:-}
+      - BAIDU_OCR_SECRET_KEY=${BAIDU_OCR_SECRET_KEY:-}
+      - LOG_LEVEL=info
+      - DATA_DIR=/data
+      - OUTPUT_DIR=/data/output
+    volumes:
+      - ./config/config.yaml:/etc/ocr-agent/config.yaml:ro
+      - ocr-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - ocr-network
+
+  # Optional: Redis cache
+  redis:
+    image: redis:7-alpine
+    container_name: ocr-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - ocr-network
+    profiles:
+      - with-cache
+
+volumes:
+  ocr-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  ocr-network:
+    driver: bridge

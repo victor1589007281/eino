@@ -1,0 +1,200 @@
+# 文生图 Agent 开发环境配置
+# Image Generation Agent Development Configuration
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  mode: "debug"
+
+# LLM 配置 - 用于理解用户意图和优化提示词
+llm:
+  provider: "openai"  # openai, ark, qwen, deepseek
+  model: "gpt-4o"
+  api_key: "${OPENAI_API_KEY}"
+  base_url: "https://api.openai.com/v1"
+  max_tokens: 4096
+  temperature: 0.7
+  timeout: 60
+  
+  # 多提供商配置
+  providers:
+    openai:
+      api_key: "${OPENAI_API_KEY}"
+      base_url: "https://api.openai.com/v1"
+      model: "gpt-4o"
+      enabled: true
+    
+    ark:
+      api_key: "${ARK_API_KEY}"
+      base_url: "https://ark.cn-beijing.volces.com/api/v3"
+      model: "doubao-pro-32k"
+      enabled: false
+    
+    qwen:
+      api_key: "${QWEN_API_KEY}"
+      base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      model: "qwen-max"
+      enabled: false
+    
+    deepseek:
+      api_key: "${DEEPSEEK_API_KEY}"
+      base_url: "https://api.deepseek.com/v1"
+      model: "deepseek-chat"
+      enabled: false
+
+# 图像生成配置
+image:
+  # 静态图生成
+  static_image:
+    provider: "dalle"  # stability, dalle, midjourney
+    api_key: "${OPENAI_API_KEY}"
+    base_url: "https://api.openai.com/v1"
+    model: "dall-e-3"
+    default_size: "1024x1024"
+    quality: "standard"  # standard, hd
+  
+  # 动图/视频生成
+  animated_gif:
+    provider: "stable_video"  # runway, pika, stable_video
+    api_key: "${STABILITY_API_KEY}"
+    base_url: "https://api.stability.ai/v2beta"
+    default_fps: 24
+    max_duration: 10  # 秒
+    default_size: "768x768"
+  
+  # 表情包生成
+  sticker:
+    provider: "dalle"
+    api_key: "${OPENAI_API_KEY}"
+    base_url: "https://api.openai.com/v1"
+    default_size: "512x512"
+    with_text: true
+    text_position: "bottom"  # top, bottom, center
+  
+  # 输出配置
+  output:
+    directory: "./output"
+    max_file_size: 10485760  # 10MB
+    format: "png"  # png, jpg, gif, webp
+
+# 视频生成配置
+video:
+  provider: "kling"  # runway, pika, kling, minimax, stable_video
+  api_key: "${VIDEO_API_KEY}"
+  base_url: "https://api.klingai.com"
+  default_duration: 4  # 秒
+  max_duration: 10  # 秒
+  default_fps: 24
+  default_resolution: "1280x720"
+  enable_two_step: true  # 先生成图片再生成视频（提高质量）
+  
+  # 多提供商配置
+  providers:
+    # 快手可灵 - 国产首选，支持文生视频和图生视频
+    kling:
+      api_key: "${KLING_API_KEY}"
+      base_url: "https://api.klingai.com"
+      enabled: true
+      max_duration: 10
+      support_i2v: true  # 图生视频
+      support_t2v: true  # 文生视频
+    
+    # Runway Gen-3 - 高质量，支持文生视频
+    runway:
+      api_key: "${RUNWAY_API_KEY}"
+      base_url: "https://api.runwayml.com"
+      enabled: false
+      max_duration: 10
+      support_i2v: true
+      support_t2v: true
+    
+    # Pika Labs - 创意视频
+    pika:
+      api_key: "${PIKA_API_KEY}"
+      base_url: "https://api.pika.art"
+      enabled: false
+      max_duration: 4
+      support_i2v: true
+      support_t2v: true
+    
+    # MiniMax 海螺视频
+    minimax:
+      api_key: "${MINIMAX_API_KEY}"
+      base_url: "https://api.minimax.chat"
+      enabled: false
+      max_duration: 6
+      support_i2v: true
+      support_t2v: true
+    
+    # Stability AI - Stable Video Diffusion
+    stable_video:
+      api_key: "${STABILITY_API_KEY}"
+      base_url: "https://api.stability.ai/v2beta"
+      enabled: false
+      max_duration: 4
+      support_i2v: true
+      support_t2v: false
+
+# 存储配置
+storage:
+  type: "local"  # local, s3, oss
+  base_path: "./data"
+  # S3/OSS 配置（可选）
+  # endpoint: "https://s3.amazonaws.com"
+  # bucket: "image-gen-bucket"
+  # access_key: "${S3_ACCESS_KEY}"
+  # secret_key: "${S3_SECRET_KEY}"
+  # region: "us-east-1"
+
+# Agent 配置
+agent:
+  name: "image-gen-agent"
+  max_iterations: 10
+  system_prompt: |
+    你是一个专业的图像和视频生成助手，可以帮助用户生成各种类型的内容，包括：
+    - 静态图片（照片、插画、艺术画等）
+    - 动态图片（GIF动图）
+    - 表情包（带文字或不带文字）
+    - 短视频（图生视频、文生视频）
+    
+    你的工作流程：
+    1. 理解用户的需求，分析他们想要什么类型的内容
+    2. 优化用户的描述，使其更适合生成
+    3. 选择合适的生成工具：
+       - generate_image: 生成静态图片
+       - generate_gif: 生成 GIF 动图
+       - generate_sticker: 生成表情包
+       - generate_video: 将图片转换为视频（需要先有图片）
+       - text_to_video: 直接从文字描述生成视频
+       - optimize_prompt: 优化提示词
+       - analyze_style: 分析风格
+    4. 执行生成并返回结果
+    
+    视频生成提示：
+    - 如果用户想让静态图片动起来，使用 generate_video（图生视频）
+    - 如果用户想直接从文字生成视频，使用 text_to_video（文生视频）
+    - 视频时长最长10秒，默认4秒
+    - 可以指定运动强度、风格、分辨率等参数
+    
+    请始终用中文与用户交流，并提供专业、友好的服务。
+  
+  enabled_tools:
+    - "generate_image"
+    - "generate_gif"
+    - "generate_sticker"
+    - "generate_video"
+    - "text_to_video"
+    - "optimize_prompt"
+    - "analyze_style"
+  
+  retry_count: 3
+  retry_delay: 1000  # 毫秒
+
+# 日志配置
+logging:
+  level: "debug"
+  format: "text"  # json, text
+  output_path: "stdout"
+  max_size: 100  # MB
+  max_backups: 3
+  max_age: 7  # days

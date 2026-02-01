@@ -1,0 +1,155 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: image-gen-agent
+  namespace: image-gen-agent
+  labels:
+    app.kubernetes.io/name: image-gen-agent
+    app.kubernetes.io/component: server
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: image-gen-agent
+      app.kubernetes.io/component: server
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: image-gen-agent
+        app.kubernetes.io/component: server
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: image-gen-agent
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      
+      containers:
+        - name: image-gen-agent
+          image: image-gen-agent:latest
+          imagePullPolicy: IfNotPresent
+          
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          
+          env:
+            - name: IMAGE_GEN_CONFIG
+              value: "/etc/image-gen-agent/config.yaml"
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: image-gen-agent-secrets
+                  key: OPENAI_API_KEY
+            - name: STABILITY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: image-gen-agent-secrets
+                  key: STABILITY_API_KEY
+            - name: ARK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: image-gen-agent-secrets
+                  key: ARK_API_KEY
+                  optional: true
+            - name: QWEN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: image-gen-agent-secrets
+                  key: QWEN_API_KEY
+                  optional: true
+            - name: DEEPSEEK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: image-gen-agent-secrets
+                  key: DEEPSEEK_API_KEY
+                  optional: true
+          
+          volumeMounts:
+            - name: config
+              mountPath: /etc/image-gen-agent
+              readOnly: true
+            - name: data
+              mountPath: /data
+            - name: output
+              mountPath: /data/output
+          
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      
+      volumes:
+        - name: config
+          configMap:
+            name: image-gen-agent-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: image-gen-agent-data
+        - name: output
+          persistentVolumeClaim:
+            claimName: image-gen-agent-output
+      
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: image-gen-agent
+                topologyKey: kubernetes.io/hostname
+      
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: image-gen-agent
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: image-gen-agent
+  namespace: image-gen-agent
+  labels:
+    app.kubernetes.io/name: image-gen-agent

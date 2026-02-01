@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: interview-expert-config
+  namespace: interview-expert
+  labels:
+    app: interview-expert
+data:
+  config.yaml: |
+    log:
+      level: info
+      format: json
+      output: stdout
+    
+    agent:
+      max_iterations: 30
+      max_concurrent_agents: 5
+      timeout: 10m
+      enable_streaming: true
+    
+    llm:
+      default_provider: zhipu
+      default_model: glm-4
+    
+    interview:
+      default_duration_minutes: 60
+      max_questions: 20
+      skill_categories:
+        - programming
+        - framework
+        - database
+        - system_design
+        - algorithm
+        - soft_skills
+        - leadership
+      enable_adaptive: true
+      adaptive_config:
+        min_questions: 5
+        max_questions: 15
+        confidence_threshold: 0.8
+        difficulty_adjust: true
+      scoring:
+        pass_threshold: 0.6
+        weight_by_difficulty: true
+    
+    output:
+      mode: detailed
+      include_diagrams: true
+      diagram_style: mermaid
+      output_dir: /data/output
+      report_format: markdown
+    
+    storage:
+      type: sqlite
+      path: /data/interview.db
+      cache_ttl: 24h
+    
+    interaction:
+      rest_server:
+        enabled: true
+        address: ":8080"
+        base_path: /api/v1
+        cors:
+          enabled: true
+          allow_origins:
+            - "*"
+          allow_methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - OPTIONS
+          allow_headers:
+            - Content-Type
+            - Authorization
+      mcp_server:
+        enabled: true
+        name: interview-expert
+        version: "1.0.0"
+        description: Interview Expert Agent MCP Server
+        transport: stdio

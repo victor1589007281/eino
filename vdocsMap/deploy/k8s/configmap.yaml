@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: image-gen-agent-config
+  namespace: image-gen-agent
+  labels:
+    app.kubernetes.io/name: image-gen-agent
+    app.kubernetes.io/component: config
+data:
+  config.yaml: |
+    server:
+      host: "0.0.0.0"
+      port: 8080
+      mode: "release"
+
+    llm:
+      provider: "openai"
+      model: "gpt-4o"
+      max_tokens: 4096
+      temperature: 0.7
+      timeout: 60
+
+    image:
+      static_image:
+        provider: "dalle"
+        model: "dall-e-3"
+        default_size: "1024x1024"
+        quality: "standard"
+      
+      animated_gif:
+        provider: "stable_video"
+        default_fps: 24
+        max_duration: 10
+        default_size: "768x768"
+      
+      sticker:
+        provider: "dalle"
+        default_size: "512x512"
+        with_text: true
+        text_position: "bottom"
+      
+      output:
+        directory: "/data/output"
+        max_file_size: 10485760
+        format: "png"
+
+    storage:
+      type: "local"
+      base_path: "/data"
+
+    agent:
+      name: "image-gen-agent"
+      max_iterations: 10
+      system_prompt: |
+        你是一个专业的图像生成助手，可以帮助用户生成各种类型的图片。
+      enabled_tools:
+        - "generate_image"
+        - "generate_gif"
+        - "generate_sticker"
+        - "optimize_prompt"
+        - "analyze_style"
+      retry_count: 3
+      retry_delay: 1000
+
+    logging:
+      level: "info"
+      format: "json"
+      output_path: "stdout"

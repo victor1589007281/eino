@@ -1,0 +1,235 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocr-agent
+  namespace: ocr-agent
+  labels:
+    app: ocr-agent
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ocr-agent
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: ocr-agent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: ocr-agent
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      
+      containers:
+      - name: ocr-agent
+        image: ocr-agent:latest
+        imagePullPolicy: Always
+        
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        
+        env:
+        - name: DEEPSEEK_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ocr-agent-secrets
+              key: DEEPSEEK_API_KEY
+        - name: QWEN_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ocr-agent-secrets
+              key: QWEN_API_KEY
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ocr-agent-secrets
+              key: OPENAI_API_KEY
+        - name: BAIDU_OCR_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ocr-agent-secrets
+              key: BAIDU_OCR_API_KEY
+        - name: BAIDU_OCR_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ocr-agent-secrets
+              key: BAIDU_OCR_SECRET_KEY
+        - name: LOG_LEVEL
+          value: "info"
+        - name: DATA_DIR
+          value: "/data"
+        - name: OUTPUT_DIR
+          value: "/data/output"
+        
+        volumeMounts:
+        - name: config
+          mountPath: /etc/ocr-agent
+          readOnly: true
+        - name: data
+          mountPath: /data
+        - name: tessdata
+          mountPath: /usr/share/tesseract-ocr/4.00/tessdata
+          readOnly: true
+        
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "2000m"
+            memory: "2Gi"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        # Startup probe for slow-starting containers
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 30
+      
+      # Init container to prepare tessdata
+      initContainers:
+      - name: init-tessdata
+        image: alpine:3.18
+        command: ['sh', '-c', 'echo "Tessdata initialization complete"']
+        volumeMounts:
+        - name: tessdata
+          mountPath: /usr/share/tesseract-ocr/4.00/tessdata
+      
+      volumes:
+      - name: config
+        configMap:
+          name: ocr-agent-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: ocr-agent-data
+      - name: tessdata
+        persistentVolumeClaim:
+          claimName: ocr-agent-tessdata
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ocr-agent
+  namespace: ocr-agent
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ocr-agent-data
+  namespace: ocr-agent
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ocr-agent-tessdata
+  namespace: ocr-agent
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: standard
+
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ocr-agent-hpa
+  namespace: ocr-agent
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ocr-agent
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 4
+        periodSeconds: 15
+      selectPolicy: Max
+
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ocr-agent-pdb
+  namespace: ocr-agent
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: ocr-agent

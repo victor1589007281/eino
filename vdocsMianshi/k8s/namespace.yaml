@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: interview-expert
+  labels:
+    app: interview-expert
+    environment: production

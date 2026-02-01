@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: image-gen-agent
+  labels:
+    app.kubernetes.io/name: image-gen-agent
+    app.kubernetes.io/component: namespace

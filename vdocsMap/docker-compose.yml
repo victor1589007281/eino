@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  image-gen-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: image-gen-agent:latest
+    container_name: image-gen-agent
+    ports:
+      - "8080:8080"
+    environment:
+      - IMAGE_GEN_CONFIG=/app/config/config.yaml
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - STABILITY_API_KEY=${STABILITY_API_KEY:-}
+      - ARK_API_KEY=${ARK_API_KEY:-}
+      - QWEN_API_KEY=${QWEN_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+    volumes:
+      - ./config/config-dev.yaml:/app/config/config.yaml:ro
+      - image-output:/data/output
+      - image-cache:/data/cache
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - image-gen-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+  # 可选：Redis 缓存服务
+  redis:
+    image: redis:7-alpine
+    container_name: image-gen-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - image-gen-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # 可选：Nginx 反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: image-gen-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx/ssl:/etc/nginx/ssl:ro
+      - image-output:/var/www/images:ro
+    depends_on:
+      - image-gen-agent
+    restart: unless-stopped
+    networks:
+      - image-gen-network
+    profiles:
+      - production
+
+volumes:
+  image-output:
+    driver: local
+  image-cache:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  image-gen-network:
+    driver: bridge

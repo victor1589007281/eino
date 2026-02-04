@@ -6,14 +6,19 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 
 	"github.com/cloudwego/eino/vdocsMysql/agent"
 	"github.com/cloudwego/eino/vdocsMysql/config"
+	"github.com/cloudwego/eino/vdocsMysql/llm"
 )
 
 func main() {
@@ -21,6 +26,7 @@ func main() {
 	configPath := flag.String("config", "", "Path to config file")
 	interactive := flag.Bool("i", false, "Run in interactive mode")
 	query := flag.String("q", "", "Single query to process")
+	serverMode := flag.Bool("server", false, "Run in server mode")
 	flag.Parse()
 
 	// Load configuration
@@ -37,35 +43,70 @@ func main() {
 		cfg = config.DefaultConfig()
 	}
 
-	// Check for API key from default provider
-	apiKeySet := false
+	// Initialize LLM
+	var chatModel model.ToolCallingChatModel
 	if cfg.LLM.DefaultProvider != "" {
-		if provider, ok := cfg.LLM.Providers[cfg.LLM.DefaultProvider]; ok {
-			var apiKey string
-			if provider.APIKeyEnv != "" {
-				apiKey = os.Getenv(provider.APIKeyEnv)
+		if providerCfg, ok := cfg.LLM.Providers[cfg.LLM.DefaultProvider]; ok {
+			// Create OpenAI provider
+			openaiCfg := &llm.OpenAIConfig{
+				BaseURL:   providerCfg.BaseURL,
+				APIKey:    providerCfg.APIKey,
+				APIKeyEnv: providerCfg.APIKeyEnv,
+				Timeout:   providerCfg.Timeout,
 			}
-			if apiKey == "" {
-				apiKey = provider.APIKey
-			}
-			if apiKey != "" {
-				apiKeySet = true
+
+			provider, err := llm.NewOpenAIProvider(openaiCfg)
+			if err != nil {
+				log.Printf("Failed to create LLM provider: %v", err)
 			} else {
-				fmt.Fprintf(os.Stderr, "Warning: API key not set for provider %s.\n", cfg.LLM.DefaultProvider)
+				// Create chat model adapter
+				modelName := cfg.LLM.DefaultModel
+				if modelName == "" {
+					// Fallback to first model in config
+					for name := range providerCfg.Models {
+						modelName = name
+						break
+					}
+				}
+
+				chatModel, err = llm.NewChatModel(context.Background(), provider, modelName)
+				if err != nil {
+					log.Printf("Failed to create chat model: %v", err)
+				}
 			}
 		}
 	}
-	_ = apiKeySet // Will be used for full agent creation
+
+	if chatModel == nil {
+		log.Println("Warning: No valid LLM provider configured. Running in demo mode.")
+	}
+
+	// Ensure tags file exists
+	if err := ensureTagsFile(cfg); err != nil {
+		log.Printf("Failed to generate tags file: %v", err)
+	}
 
 	ctx := context.Background()
 
-	// Create master agent (without chat model for now - demo mode)
+	// Create master agent
 	var masterAgent *agent.MasterAgent
-	// Note: Full agent creation requires a proper ToolCallingChatModel implementation.
-	// For testing, we'll use demo mode.
+	if chatModel != nil {
+		masterAgent, err = agent.NewMasterAgent(ctx, &agent.MasterAgentConfig{
+			Config:    cfg,
+			ChatModel: chatModel,
+		})
+		if err != nil {
+			log.Printf("Failed to create master agent: %v", err)
+			masterAgent = nil
+		}
+	}
 
 	// Run mode
-	if *query != "" {
+	if *serverMode {
+		if err := agent.RunServerMode(ctx, masterAgent, cfg); err != nil {
+			log.Fatalf("Server failed: %v", err)
+		}
+	} else if *query != "" {
 		// Single query mode
 		processQuery(ctx, masterAgent, *query, cfg)
 	} else if *interactive {
@@ -76,7 +117,6 @@ func main() {
 		printUsage()
 	}
 }
-
 
 // processQuery processes a single query.
 func processQuery(ctx context.Context, masterAgent *agent.MasterAgent, query string, cfg *config.Config) {
@@ -250,4 +290,23 @@ func printDemoOutput(query string, cfg *config.Config) {
 	fmt.Println("---")
 	fmt.Printf("源码路径: %s\n", cfg.Source.Path)
 	fmt.Printf("输出模式: %s\n", cfg.Output.Mode)
+}
+
+// ensureTagsFile ensures the ctags file exists.
+func ensureTagsFile(cfg *config.Config) error {
+	indexPath := cfg.Index.Path
+	if err := os.MkdirAll(indexPath, 0755); err != nil {
+		return fmt.Errorf("failed to create index directory: %w", err)
+	}
+
+	tagsPath := filepath.Join(indexPath, "tags")
+	if _, err := os.Stat(tagsPath); err == nil {
+		return nil // exists
+	}
+
+	log.Printf("Generating tags file at %s from %s...", tagsPath, cfg.Source.Path)
+	cmd := exec.Command("ctags", "-R", "-f", tagsPath, cfg.Source.Path)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }

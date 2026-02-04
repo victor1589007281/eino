@@ -56,6 +56,10 @@ func (t *GrepTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 - 搜索特定代码模式
 - 搜索关键字/变量名
 
+注意：
+- ripgrep正则语法中，字面量花括号需要转义，例如 interface\{ \}。
+- C++代码中的模板语法 <T> 等通常不需要转义。
+
 参数说明：
 - pattern: 搜索模式，支持正则表达式
 - file_types: 文件类型过滤，如 ["cc", "h"]
@@ -84,6 +88,10 @@ func (t *GrepTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 				Type: schema.Boolean,
 				Desc: "是否大小写敏感，默认true",
 			},
+			"multiline": {
+				Type: schema.Boolean,
+				Desc: "是否启用多行匹配模式（允许匹配换行符），默认false",
+			},
 		}),
 	}, nil
 }
@@ -95,6 +103,7 @@ type GrepInput struct {
 	Directories   []string `json:"directories"`
 	ContextLines  int      `json:"context_lines"`
 	CaseSensitive *bool    `json:"case_sensitive"`
+	Multiline     bool     `json:"multiline"`
 }
 
 // GrepResult represents a single grep result.
@@ -135,6 +144,11 @@ func (t *GrepTool) InvokableRun(ctx context.Context, argumentsInJSON string, opt
 	// Case sensitivity
 	if input.CaseSensitive != nil && !*input.CaseSensitive {
 		args = append(args, "-i")
+	}
+
+	// Multiline mode
+	if input.Multiline {
+		args = append(args, "--multiline", "--multiline-dotall")
 	}
 
 	// File types

@@ -4,6 +4,9 @@ FROM golang:1.22-alpine AS builder
 # Install build dependencies (including SQLite dev for CGO)
 RUN apk add --no-cache git make gcc musl-dev sqlite-dev
 
+# Set Go Proxy
+ENV GOPROXY=https://goproxy.cn,direct
+
 # Build arguments
 ARG VERSION=dev
 ARG COMMIT=unknown

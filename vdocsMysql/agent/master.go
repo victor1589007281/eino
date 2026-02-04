@@ -4,6 +4,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/cloudwego/eino/adk"
@@ -19,9 +20,9 @@ import (
 
 // MasterAgent is the main coordinator agent for MySQL kernel analysis.
 type MasterAgent struct {
-	config      *config.Config
-	chatModel   model.ToolCallingChatModel
-	agent       adk.ResumableAgent
+	config       *config.Config
+	chatModel    model.ToolCallingChatModel
+	agent        adk.ResumableAgent
 	skillBackend skill.Backend
 }
 
@@ -53,6 +54,7 @@ func NewMasterAgent(ctx context.Context, cfg *MasterAgentConfig) (*MasterAgent, 
 
 	symbolTool := tools.NewSymbolLookupTool(&tools.SymbolLookupConfig{
 		SourcePath: cfg.Config.Source.Path,
+		TagsPath:   filepath.Join(cfg.Config.Index.Path, "tags"),
 	})
 
 	// Create skill middleware
@@ -152,12 +154,12 @@ func (ma *MasterAgent) Run(ctx context.Context, input *adk.AgentInput, opts ...a
 type IntentType string
 
 const (
-	IntentCodeSearch      IntentType = "code_search"
+	IntentCodeSearch       IntentType = "code_search"
 	IntentExplainMechanism IntentType = "explain_mechanism"
-	IntentCallChain       IntentType = "call_chain"
-	IntentPerformance     IntentType = "performance"
-	IntentArchitecture    IntentType = "architecture"
-	IntentSimulation      IntentType = "simulation"
+	IntentCallChain        IntentType = "call_chain"
+	IntentPerformance      IntentType = "performance"
+	IntentArchitecture     IntentType = "architecture"
+	IntentSimulation       IntentType = "simulation"
 )
 
 // ClassifyIntent classifies the user's intent from the query.
@@ -212,7 +214,8 @@ const masterAgentInstruction = `你是一个MySQL内核专家Agent，专门从Pe
 - 所有结论必须有源码依据
 - 代码搜索要准确定位，避免模糊匹配
 - 复杂问题要分步骤分析
-- 涉及性能问题要关注热点路径`
+- 涉及性能问题要关注热点路径
+- **性能优化**: 使用 grep_code 时，尽量指定 file_types (如 ["cc", "h"]) 或 directories (如 ["sql/"]) 以减少搜索范围，提高响应速度`
 
 const codeSearchAgentInstruction = `你是代码搜索专家，负责在MySQL源码中精确定位代码。
 
@@ -221,6 +224,10 @@ const codeSearchAgentInstruction = `你是代码搜索专家，负责在MySQL源
 2. **函数调用**: 使用 "函数名\\s*\\(" 模式
 3. **结构体定义**: 使用 "struct\\s+结构体名" 模式
 4. **宏定义**: 使用 "#define\\s+宏名" 模式
+
+## 注意事项
+- ripgrep正则语法中，字面量花括号必须转义，例如 "function.*\\{" 而不是 "function.*{"
+- 尽量指定 file_types (如 ["cc", "h"]) 或 directories (如 ["sql/"]) 以减少搜索范围
 
 ## 目录知识
 - sql/: SQL层代码

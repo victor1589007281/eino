@@ -43,3 +43,7 @@ output/*
 .trae
 
 .DS_Store
+
+# Ignore vdocsMysql data directory
+vdocsMysql/data/
+

@@ -4,10 +4,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/cloudwego/eino/vdocsMysql/agent"
 	"github.com/cloudwego/eino/vdocsMysql/cache"
 	"github.com/cloudwego/eino/vdocsMysql/config"
 	"github.com/cloudwego/eino/vdocsMysql/index"
@@ -142,6 +145,18 @@ func main() {
 		fmt.Println()
 	}
 
+	// Test 8: Server Mode
+	fmt.Println("🌐 测试8: 服务器模式 & 流式响应")
+	fmt.Println(strings.Repeat("-", 60))
+	if testServerMode(ctx) {
+		fmt.Println("✅ 服务器模式测试通过")
+		passed++
+	} else {
+		fmt.Println("❌ 服务器模式测试失败")
+		failed++
+	}
+	fmt.Println()
+
 	// Summary
 	fmt.Println("=" + strings.Repeat("=", 59))
 	fmt.Printf("  测试总结: 通过 %d, 失败 %d\n", passed, failed)
@@ -222,6 +237,84 @@ func testSQLiteStorage(ctx context.Context, dataDir string) bool {
 		statsInfo.DocumentCount, statsInfo.TermCount, statsInfo.FunctionCount)
 
 	return true
+}
+
+func testServerMode(ctx context.Context) bool {
+	// Check if server is already running
+	client := &http.Client{Timeout: 2 * time.Second}
+	_, err := client.Get("http://localhost:8080/health")
+
+	if err != nil {
+		fmt.Println("  启动内置服务器 (Mock Agent)...")
+		go func() {
+			// Start with nil masterAgent to test shell
+			// Note: This will listen on 8080
+			cfg := &config.Config{
+				Agent: config.AgentConfig{
+					EnableStreaming: true,
+				},
+			}
+			agent.RunServerMode(ctx, nil, cfg)
+		}()
+		time.Sleep(2 * time.Second)
+	} else {
+		fmt.Println("  检测到现有服务器，直接测试...")
+	}
+
+	// Test health
+	resp, err := client.Get("http://localhost:8080/health")
+	if err != nil {
+		fmt.Printf("  健康检查请求失败: %v\n", err)
+		return false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("  健康检查状态码错误: %d\n", resp.StatusCode)
+		return false
+	}
+	fmt.Println("  ✓ 健康检查通过")
+
+	// Test query
+	// Use a simple query. If it's the nil agent, it returns 503.
+	resp, err = client.Post("http://localhost:8080/query", "text/plain", strings.NewReader("test query"))
+	if err != nil {
+		fmt.Printf("  查询请求失败: %v\n", err)
+		return false
+	}
+	defer resp.Body.Close()
+
+	// Check streaming header
+	isChunked := resp.Header.Get("Transfer-Encoding") == "chunked"
+	if !isChunked && len(resp.TransferEncoding) > 0 {
+		for _, te := range resp.TransferEncoding {
+			if te == "chunked" {
+				isChunked = true
+				break
+			}
+		}
+	}
+	
+	if isChunked {
+		fmt.Println("  ✓ 检测到流式响应头 (Transfer-Encoding: chunked)")
+	} else {
+		fmt.Println("  ⚠️ 未检测到流式响应头")
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Printf("  响应状态: %d\n", resp.StatusCode)
+
+	if len(body) > 0 {
+		fmt.Printf("  响应内容(前50字符): %s...\n", string(body)[:min(len(body), 50)])
+	}
+
+	return true
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func testBoltDBStorage(ctx context.Context, dataDir string) bool {

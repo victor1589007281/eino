@@ -1,0 +1,165 @@
+{
+  "search": {
+    "default_engine": "serper",
+    "max_results": 10,
+    "timeout": 30000000000,
+    "auto_fallback": true,
+    "engines": {
+      "serper": {
+        "enabled": true,
+        "api_key": "${SERPER_API_KEY}",
+        "endpoint": "https://google.serper.dev/search",
+        "priority": 1
+      },
+      "tavily": {
+        "enabled": true,
+        "api_key": "${TAVILY_API_KEY}",
+        "endpoint": "https://api.tavily.com/search",
+        "priority": 2
+      },
+      "exa": {
+        "enabled": true,
+        "api_key": "${EXA_API_KEY}",
+        "endpoint": "https://api.exa.ai/search",
+        "priority": 3
+      },
+      "searxng": {
+        "enabled": true,
+        "api_key": "",
+        "endpoint": "https://searx.be",
+        "priority": 4
+      },
+      "bing": {
+        "enabled": true,
+        "api_key": "",
+        "endpoint": "",
+        "priority": 5
+      },
+      "duckduckgo": {
+        "enabled": true,
+        "api_key": "",
+        "endpoint": "",
+        "priority": 6
+      },
+      "baidu": {
+        "enabled": true,
+        "api_key": "",
+        "endpoint": "",
+        "priority": 7
+      },
+      "brave": {
+        "enabled": false,
+        "api_key": "${BRAVE_API_KEY}",
+        "endpoint": "",
+        "priority": 8
+      }
+    },
+    "router": {
+      "strategy": "health_first",
+      "circuit_breaker_threshold": 3,
+      "circuit_breaker_timeout": 60000000000,
+      "health_check_interval": 30000000000
+    }
+  },
+  "email": {
+    "default_provider": "qq",
+    "attachment_dir": "./work/attachments",
+    "providers": {
+      "qq": {
+        "imap_server": "imap.qq.com",
+        "imap_port": 993,
+        "smtp_server": "smtp.qq.com",
+        "smtp_port": 465,
+        "use_ssl": true
+      },
+      "163": {
+        "imap_server": "imap.163.com",
+        "imap_port": 993,
+        "smtp_server": "smtp.163.com",
+        "smtp_port": 465,
+        "use_ssl": true
+      },
+      "gmail": {
+        "imap_server": "imap.gmail.com",
+        "imap_port": 993,
+        "smtp_server": "smtp.gmail.com",
+        "smtp_port": 587,
+        "use_ssl": true
+      }
+    },
+    "intent": {
+      "enabled": true,
+      "keywords_file": ""
+    }
+  },
+  "memory": {
+    "l1": {
+      "redis_addr": "localhost:6379",
+      "redis_password": "${REDIS_PASSWORD}",
+      "redis_db": 0,
+      "max_messages": 20,
+      "max_tokens": 4000,
+      "key_prefix": "memory:l1:"
+    },
+    "l2": {
+      "milvus_addr": "localhost:19530",
+      "collection_name": "memory_capsules",
+      "postgres_dsn": "${POSTGRES_DSN}",
+      "retention_days": 30,
+      "vector_dimension": 1536
+    },
+    "l3": {
+      "s3_endpoint": "localhost:9000",
+      "s3_bucket": "memory-archive",
+      "s3_access_key": "${S3_ACCESS_KEY}",
+      "s3_secret_key": "${S3_SECRET_KEY}",
+      "s3_region": "us-east-1",
+      "neo4j_uri": "bolt://localhost:7687",
+      "neo4j_user": "neo4j",
+      "neo4j_password": "${NEO4J_PASSWORD}",
+      "enable_compression": true
+    },
+    "retrieval": {
+      "similarity_threshold": 0.8,
+      "default_token_budget": 4000,
+      "channel_weights": {
+        "semantic_search": 0.4,
+        "entity_graph": 0.3,
+        "temporal_near": 0.2,
+        "user_pinned": 0.1
+      },
+      "time_decay_factor": 0.95
+    }
+  },
+  "jobsearch": {
+    "adzuna_app_id": "${ADZUNA_APP_ID}",
+    "adzuna_app_key": "${ADZUNA_APP_KEY}",
+    "cache_ttl": 1800000000000,
+    "rate_limit": 30,
+    "default_country": "gb"
+  },
+  "mcp": {
+    "server_name": "agent-tools",
+    "server_version": "1.0.0",
+    "listen_addr": ":8080"
+  },
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "output": "stdout"
+  },
+  "algorithm": {
+    "deepseek": {
+      "api_key": "${DEEPSEEK_API_KEY}",
+      "endpoint": "https://api.deepseek.com/v1"
+    }
+  },
+  "credentials": {
+    "email": {
+      "qq": {
+        "username": "${EMAIL_QQ_USERNAME}",
+        "password": "${EMAIL_QQ_PASSWORD}"
+      }
+    }
+  }
+}

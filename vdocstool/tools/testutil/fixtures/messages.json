@@ -1,0 +1,102 @@
+{
+  "conversations": [
+    {
+      "session_id": "test-session-1",
+      "topic": "Go Language Learning",
+      "messages": [
+        {
+          "role": "user",
+          "content": "你好，我想学习 Go 语言",
+          "token_count": 12
+        },
+        {
+          "role": "assistant",
+          "content": "好的！Go 是一门非常优秀的编程语言。你之前有什么编程经验吗？",
+          "token_count": 25
+        },
+        {
+          "role": "user",
+          "content": "我有 Python 和 Java 的经验",
+          "token_count": 15
+        },
+        {
+          "role": "assistant",
+          "content": "太棒了！有这些基础会让你学习 Go 更加容易。Go 的特点包括：\n1. 简洁的语法\n2. 强大的并发支持\n3. 快速的编译速度\n4. 静态类型系统",
+          "token_count": 60
+        },
+        {
+          "role": "user",
+          "content": "Go 的并发是怎么实现的？",
+          "token_count": 15
+        },
+        {
+          "role": "assistant",
+          "content": "Go 的并发主要通过 goroutine 和 channel 实现。goroutine 是轻量级线程，channel 用于 goroutine 之间的通信。这是 Go 的核心特性之一。",
+          "token_count": 50
+        }
+      ],
+      "expected_entities": ["Go", "Python", "Java", "goroutine", "channel"],
+      "expected_summary_keywords": ["Go", "编程语言", "并发", "goroutine"]
+    },
+    {
+      "session_id": "test-session-2",
+      "topic": "Project Discussion",
+      "messages": [
+        {
+          "role": "user",
+          "content": "我们的项目需要设计一个微服务架构",
+          "token_count": 18
+        },
+        {
+          "role": "assistant",
+          "content": "好的，微服务架构有很多设计考虑。你们的主要业务场景是什么？",
+          "token_count": 25
+        },
+        {
+          "role": "user",
+          "content": "主要是电商平台，需要处理订单、支付、库存等模块",
+          "token_count": 25
+        },
+        {
+          "role": "assistant",
+          "content": "对于电商平台，建议的微服务划分：\n1. 用户服务\n2. 商品服务\n3. 订单服务\n4. 支付服务\n5. 库存服务\n6. 通知服务\n\n每个服务独立部署，通过 API 网关统一入口。",
+          "token_count": 80
+        }
+      ],
+      "expected_entities": ["微服务", "电商", "订单", "支付", "库存", "API网关"],
+      "expected_summary_keywords": ["微服务", "电商", "架构设计"]
+    }
+  ],
+  "retrieval_queries": [
+    {
+      "query": "Go 的并发特性",
+      "session_id": "test-session-1",
+      "expected_keywords": ["goroutine", "channel", "并发"]
+    },
+    {
+      "query": "微服务架构设计",
+      "session_id": "test-session-2",
+      "expected_keywords": ["微服务", "电商", "服务划分"]
+    }
+  ],
+  "archive_scenarios": [
+    {
+      "name": "L1 溢出测试",
+      "message_count": 25,
+      "expected_archive_trigger": true,
+      "expected_reason": "message_count_exceeded"
+    },
+    {
+      "name": "Token 超限测试",
+      "token_count": 5000,
+      "expected_archive_trigger": true,
+      "expected_reason": "token_count_exceeded"
+    },
+    {
+      "name": "正常状态",
+      "message_count": 10,
+      "token_count": 2000,
+      "expected_archive_trigger": false
+    }
+  ]
+}

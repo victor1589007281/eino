@@ -1,0 +1,62 @@
+{
+  "duckduckgo": {
+    "RelatedTopics": [
+      {
+        "FirstURL": "https://go.dev/",
+        "Text": "Go Programming Language - Official website of the Go programming language"
+      },
+      {
+        "FirstURL": "https://go.dev/doc/",
+        "Text": "Go Documentation - Official documentation for the Go language"
+      },
+      {
+        "FirstURL": "https://go.dev/tour/",
+        "Text": "A Tour of Go - Interactive introduction to Go"
+      }
+    ]
+  },
+  "bing": {
+    "webPages": {
+      "value": [
+        {
+          "name": "Go Programming Language",
+          "url": "https://go.dev/",
+          "snippet": "Go is an open source programming language that makes it simple to build secure, scalable systems."
+        },
+        {
+          "name": "Getting Started with Go",
+          "url": "https://go.dev/doc/tutorial/getting-started",
+          "snippet": "Tutorial: Get started with Go - In this tutorial, you'll get a brief introduction to Go programming."
+        }
+      ]
+    }
+  },
+  "baidu": {
+    "results": [
+      {
+        "title": "Go语言中文网",
+        "url": "https://studygolang.com/",
+        "snippet": "Go语言中文网，中国 Golang 爱好者的学习家园"
+      },
+      {
+        "title": "Go语言入门教程",
+        "url": "https://www.runoob.com/go/go-tutorial.html",
+        "snippet": "Go 语言教程 - 菜鸟教程"
+      }
+    ]
+  },
+  "serper": {
+    "organic": [
+      {
+        "title": "Go Programming Language",
+        "link": "https://go.dev/",
+        "snippet": "Build simple, secure, scalable systems with Go"
+      },
+      {
+        "title": "Learn Go",
+        "link": "https://go.dev/learn/",
+        "snippet": "Get started learning Go with these resources"
+      }
+    ]
+  }
+}

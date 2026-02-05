@@ -1,0 +1,100 @@
+{
+  "emails": [
+    {
+      "uid": 1,
+      "subject": "【发票】2024年1月费用报销发票",
+      "from": "finance@company.com",
+      "to": ["test@example.com"],
+      "date": "2024-01-10T10:00:00Z",
+      "body": "您好，附件为本月报销发票，请查收。\n\n财务部",
+      "has_attachment": true,
+      "attachments": [
+        {
+          "filename": "invoice_202401.pdf",
+          "content_type": "application/pdf",
+          "size": 102400
+        }
+      ],
+      "flags": ["\\Seen"],
+      "expected_intent": "invoice",
+      "expected_keywords": ["发票", "报销"]
+    },
+    {
+      "uid": 2,
+      "subject": "会议邀请: 项目周会 - 2024/01/15 14:00",
+      "from": "manager@company.com",
+      "to": ["test@example.com"],
+      "date": "2024-01-12T09:00:00Z",
+      "body": "诚邀您参加项目周会\n\n时间：2024年1月15日 14:00-15:00\n地点：会议室A\n\n请准时参加。",
+      "has_attachment": true,
+      "attachments": [
+        {
+          "filename": "meeting.ics",
+          "content_type": "text/calendar",
+          "size": 1024
+        }
+      ],
+      "expected_intent": "meeting",
+      "expected_keywords": ["会议", "邀请", "项目"]
+    },
+    {
+      "uid": 3,
+      "subject": "【限时优惠】新年大促销，全场5折起！",
+      "from": "promo@shop.com",
+      "to": ["test@example.com"],
+      "date": "2024-01-13T08:00:00Z",
+      "body": "亲爱的用户，\n\n新年大促销开始啦！\n全场5折起，限时3天！\n\n赶快抢购吧！",
+      "expected_intent": "promotion",
+      "expected_keywords": ["促销", "优惠", "折扣"]
+    },
+    {
+      "uid": 4,
+      "subject": "Re: 本周工作汇报",
+      "from": "colleague@company.com",
+      "to": ["test@example.com"],
+      "date": "2024-01-14T16:30:00Z",
+      "body": "收到，已阅读你的汇报，做得不错！\n\n有几点建议：\n1. 项目进度可以加快\n2. 文档需要补充\n\n继续加油！",
+      "has_attachment": true,
+      "attachments": [
+        {
+          "filename": "report_week3.docx",
+          "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "size": 51200
+        }
+      ],
+      "expected_intent": "work",
+      "expected_keywords": ["汇报", "工作"]
+    },
+    {
+      "uid": 5,
+      "subject": "您的外卖订单已送达",
+      "from": "order@delivery.com",
+      "to": ["test@example.com"],
+      "date": "2024-01-14T12:15:00Z",
+      "body": "您的订单已送达，请及时取餐。\n\n订单号：123456\n商家：好味道餐厅\n\n如有问题请联系客服。",
+      "expected_intent": "notification",
+      "expected_keywords": ["订单", "送达"]
+    }
+  ],
+  "search_queries": [
+    {
+      "query": "查找最近的发票",
+      "expected_intents": ["invoice"],
+      "expected_attachment_types": ["pdf"]
+    },
+    {
+      "query": "下周的会议邀请",
+      "expected_intents": ["meeting"],
+      "expected_time_range": true
+    },
+    {
+      "query": "促销优惠邮件",
+      "expected_intents": ["promotion"]
+    },
+    {
+      "query": "工作相关的文档",
+      "expected_intents": ["work"],
+      "expected_attachment_types": ["word", "pdf"]
+    }
+  ]
+}

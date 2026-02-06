@@ -1,0 +1,343 @@
+syntax = "proto3";
+
+package memory.v1;
+
+option go_package = "github.com/cloudwego/eino/vdocstool/tools/memory/grpc/pb";
+
+// MemoryService Memory 服务
+service MemoryService {
+    // 存储消息
+    rpc Store(StoreRequest) returns (StoreResponse);
+    
+    // 检索上下文
+    rpc Retrieve(RetrieveRequest) returns (RetrieveResponse);
+    
+    // 批量存储
+    rpc BatchStore(BatchStoreRequest) returns (BatchStoreResponse);
+    
+    // 批量检索
+    rpc BatchRetrieve(BatchRetrieveRequest) returns (BatchRetrieveResponse);
+    
+    // 获取会话信息
+    rpc GetSession(GetSessionRequest) returns (SessionInfo);
+    
+    // 删除会话
+    rpc DeleteSession(DeleteSessionRequest) returns (DeleteSessionResponse);
+    
+    // 切换主题
+    rpc SwitchTopic(SwitchTopicRequest) returns (SwitchTopicResponse);
+    
+    // 召回主题
+    rpc RecallTopic(RecallTopicRequest) returns (RecallTopicResponse);
+    
+    // 列出主题
+    rpc ListTopics(ListTopicsRequest) returns (ListTopicsResponse);
+    
+    // 获取实体关系
+    rpc GetEntityRelations(GetEntityRelationsRequest) returns (GetEntityRelationsResponse);
+    
+    // 生成摘要
+    rpc Summarize(SummarizeRequest) returns (SummaryResponse);
+    
+    // 归档会话
+    rpc Archive(ArchiveRequest) returns (ArchiveResponse);
+    
+    // 获取统计
+    rpc GetStats(GetStatsRequest) returns (StatsResponse);
+    
+    // 健康检查
+    rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+// StoreRequest 存储请求
+message StoreRequest {
+    string session_id = 1;
+    string source = 2;
+    MessageInput message = 3;
+    map<string, string> metadata = 4;
+    StoreOptions options = 5;
+}
+
+// MessageInput 消息输入
+message MessageInput {
+    string role = 1;
+    string content = 2;
+    string topic_id = 3;
+    int64 timestamp = 4;  // Unix timestamp
+}
+
+// StoreOptions 存储选项
+message StoreOptions {
+    bool extract_entities = 1;
+    bool generate_embedding = 2;
+    double importance = 3;
+}
+
+// StoreResponse 存储响应
+message StoreResponse {
+    string message_id = 1;
+    string tier = 2;
+    int32 token_count = 3;
+    repeated string entities_extracted = 4;
+    bool archive_triggered = 5;
+}
+
+// RetrieveRequest 检索请求
+message RetrieveRequest {
+    string session_id = 1;
+    string query = 2;
+    RetrieveOptions options = 3;
+}
+
+// RetrieveOptions 检索选项
+message RetrieveOptions {
+    int32 token_budget = 1;
+    string topic_id = 2;
+    TimeRange time_range = 3;
+    map<string, string> filters = 4;
+    bool include_summary = 5;
+    bool include_entities = 6;
+}
+
+// TimeRange 时间范围
+message TimeRange {
+    int64 start = 1;  // Unix timestamp
+    int64 end = 2;    // Unix timestamp
+}
+
+// RetrieveResponse 检索响应
+message RetrieveResponse {
+    repeated ContextItem context = 1;
+    string summary = 2;
+    repeated EntityInfo entities = 3;
+    int32 total_tokens = 4;
+    SearchStats search_stats = 5;
+}
+
+// ContextItem 上下文项
+message ContextItem {
+    string message_id = 1;
+    string role = 2;
+    string content = 3;
+    int64 timestamp = 4;
+    double relevance_score = 5;
+    string tier = 6;
+}
+
+// EntityInfo 实体信息
+message EntityInfo {
+    string name = 1;
+    string type = 2;
+    int32 mentions = 3;
+}
+
+// SearchStats 搜索统计
+message SearchStats {
+    int32 l1_hits = 1;
+    int32 l2_hits = 2;
+    int32 l3_hits = 3;
+    int64 search_latency_ms = 4;
+}
+
+// BatchStoreRequest 批量存储请求
+message BatchStoreRequest {
+    string session_id = 1;
+    repeated MessageInput messages = 2;
+    BatchStoreOptions options = 3;
+}
+
+// BatchStoreOptions 批量存储选项
+message BatchStoreOptions {
+    bool preserve_order = 1;
+    bool parallel_processing = 2;
+}
+
+// BatchStoreResponse 批量存储响应
+message BatchStoreResponse {
+    repeated StoreResponse results = 1;
+    int32 success_count = 2;
+    int32 failed_count = 3;
+    int32 total_tokens = 4;
+}
+
+// BatchRetrieveRequest 批量检索请求
+message BatchRetrieveRequest {
+    repeated SingleRetrieveRequest requests = 1;
+    BatchRetrieveOptions options = 2;
+}
+
+// SingleRetrieveRequest 单个检索请求
+message SingleRetrieveRequest {
+    string session_id = 1;
+    string query = 2;
+}
+
+// BatchRetrieveOptions 批量检索选项
+message BatchRetrieveOptions {
+    bool parallel = 1;
+    int32 timeout_ms = 2;
+}
+
+// BatchRetrieveResponse 批量检索响应
+message BatchRetrieveResponse {
+    repeated RetrieveResponse results = 1;
+}
+
+// GetSessionRequest 获取会话请求
+message GetSessionRequest {
+    string session_id = 1;
+}
+
+// SessionInfo 会话信息
+message SessionInfo {
+    string session_id = 1;
+    int32 message_count = 2;
+    int32 token_count = 3;
+    int32 topic_count = 4;
+    string current_topic_id = 5;
+    int64 created_at = 6;
+    int64 last_active_at = 7;
+}
+
+// DeleteSessionRequest 删除会话请求
+message DeleteSessionRequest {
+    string session_id = 1;
+}
+
+// DeleteSessionResponse 删除会话响应
+message DeleteSessionResponse {
+    bool deleted = 1;
+}
+
+// SwitchTopicRequest 切换主题请求
+message SwitchTopicRequest {
+    string session_id = 1;
+    string new_topic = 2;
+}
+
+// SwitchTopicResponse 切换主题响应
+message SwitchTopicResponse {
+    string capsule_id = 1;
+    string topic_title = 2;
+    int32 message_count = 3;
+    int32 token_count = 4;
+}
+
+// RecallTopicRequest 召回主题请求
+message RecallTopicRequest {
+    string session_id = 1;
+    string topic_query = 2;
+}
+
+// RecallTopicResponse 召回主题响应
+message RecallTopicResponse {
+    string capsule_id = 1;
+    string topic_title = 2;
+    bool loaded_from_l3 = 3;
+    string summary = 4;
+}
+
+// ListTopicsRequest 列出主题请求
+message ListTopicsRequest {
+    string session_id = 1;
+}
+
+// ListTopicsResponse 列出主题响应
+message ListTopicsResponse {
+    repeated TopicInfo topics = 1;
+}
+
+// TopicInfo 主题信息
+message TopicInfo {
+    string topic_id = 1;
+    string title = 2;
+    int32 message_count = 3;
+    int32 token_count = 4;
+    int64 created_at = 5;
+    int64 last_active_at = 6;
+    string tier = 7;
+}
+
+// GetEntityRelationsRequest 获取实体关系请求
+message GetEntityRelationsRequest {
+    string entity_name = 1;
+    int32 depth = 2;
+}
+
+// GetEntityRelationsResponse 获取实体关系响应
+message GetEntityRelationsResponse {
+    string entity_name = 1;
+    repeated Relation relations = 2;
+    int32 depth = 3;
+}
+
+// Relation 关系
+message Relation {
+    string source = 1;
+    string target = 2;
+    string type = 3;
+    double weight = 4;
+}
+
+// SummarizeRequest 摘要请求
+message SummarizeRequest {
+    string session_id = 1;
+}
+
+// SummaryResponse 摘要响应
+message SummaryResponse {
+    string summary = 1;
+    int32 message_count = 2;
+    int32 token_count = 3;
+    repeated string key_entities = 4;
+}
+
+// ArchiveRequest 归档请求
+message ArchiveRequest {
+    string session_id = 1;
+    string topic_title = 2;
+}
+
+// ArchiveResponse 归档响应
+message ArchiveResponse {
+    string capsule_id = 1;
+    string archive_id = 2;
+    bool archived = 3;
+}
+
+// GetStatsRequest 获取统计请求
+message GetStatsRequest {}
+
+// StatsResponse 统计响应
+message StatsResponse {
+    TierStats l1 = 1;
+    TierStats l2 = 2;
+    TierStats l3 = 3;
+    TotalStats total = 4;
+}
+
+// TierStats 层级统计
+message TierStats {
+    int32 session_count = 1;
+    int32 message_count = 2;
+    int64 token_count = 3;
+    int64 size_bytes = 4;
+}
+
+// TotalStats 总计统计
+message TotalStats {
+    int32 total_sessions = 1;
+    int32 total_messages = 2;
+    int64 total_tokens = 3;
+    int64 total_size_bytes = 4;
+}
+
+// HealthRequest 健康检查请求
+message HealthRequest {}
+
+// HealthResponse 健康检查响应
+message HealthResponse {
+    string status = 1;
+    string version = 2;
+    int64 timestamp = 3;
+}

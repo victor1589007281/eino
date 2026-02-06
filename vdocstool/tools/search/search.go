@@ -80,7 +80,7 @@ func (t *WebSearchTool) Close() {
 // Register 注册到 MCP Server
 func (t *WebSearchTool) Register(server *mcp.Server) {
 	// 注册搜索工具
-	searchTool := mcp.NewToolBuilder("web_search", "执行网页搜索，支持多引擎自动降级").
+	searchTool := mcp.NewToolBuilder("web_search", "执行网页搜索，支持多引擎自动降级和智能路由").
 		AddProperty("query", "string", "搜索查询词", true).
 		AddEnumProperty("preferred_engine", "首选搜索引擎", []string{
 			"serper",    // Google 代理，推荐
@@ -107,7 +107,15 @@ func (t *WebSearchTool) Register(server *mcp.Server) {
 
 	// 注册路由策略工具
 	strategyTool := mcp.NewToolBuilder("set_routing_strategy", "设置搜索路由策略").
-		AddEnumProperty("strategy", "路由策略", []string{"health_first", "round_robin", "weighted"}, true).
+		AddEnumProperty("strategy", "路由策略", []string{
+			"health_first",  // 健康优先
+			"round_robin",   // 轮询
+			"weighted",      // 加权
+			"quality_first", // 质量优先
+			"cost_saving",   // 成本节约
+			"balanced",      // 均衡
+			"smart",         // 智能选择
+		}, true).
 		Build()
 
 	server.RegisterTool(strategyTool, t.handleSetStrategy)
@@ -120,6 +128,26 @@ func (t *WebSearchTool) Register(server *mcp.Server) {
 		Build()
 
 	server.RegisterTool(extractTool, t.handleExtractContent)
+
+	// 注册引擎状态工具（新）
+	statusTool := mcp.NewToolBuilder("get_engine_status", "获取所有搜索引擎的完整状态，包括配额、质量、得分").
+		AddProperty("query", "string", "可选查询词，用于计算针对特定查询的得分", false).
+		Build()
+
+	server.RegisterTool(statusTool, t.handleGetEngineStatus)
+
+	// 注册配额报告工具（新）
+	quotaTool := mcp.NewToolBuilder("get_quota_report", "获取搜索引擎配额使用报告").
+		Build()
+
+	server.RegisterTool(quotaTool, t.handleGetQuotaReport)
+
+	// 注册查询分类工具（新）
+	classifyTool := mcp.NewToolBuilder("classify_query", "分析查询类型，返回分类结果和推荐引擎").
+		AddProperty("query", "string", "要分类的查询词", true).
+		Build()
+
+	server.RegisterTool(classifyTool, t.handleClassifyQuery)
 }
 
 // handleWebSearch 处理搜索请求
@@ -222,4 +250,142 @@ func (t *WebSearchTool) handleExtractContent(ctx context.Context, args map[strin
 		ExtractType: extractType,
 		MaxLength:   maxLength,
 	})
+}
+
+// handleGetEngineStatus 处理获取引擎状态请求
+func (t *WebSearchTool) handleGetEngineStatus(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	query, _ := args["query"].(string)
+
+	// 获取基础状态
+	engineStates := t.router.GetEngineStates()
+
+	// 获取配额状态
+	quotaStatus := t.router.GetQuotaManager().GetAllQuotaStatus()
+
+	// 构建响应
+	type EngineStatusResponse struct {
+		Name         string                  `json:"name"`
+		Status       string                  `json:"status"`
+		Priority     int                     `json:"priority"`
+		QuotaStatus  string                  `json:"quota_status"`
+		QuotaHealth  float64                 `json:"quota_health"`
+		MonthlyUsed  int64                   `json:"monthly_used"`
+		MonthlyLimit int64                   `json:"monthly_limit"`
+		IsFree       bool                    `json:"is_free"`
+		Score        float64                 `json:"score,omitempty"`
+		ScoreDetails *router.ScoreDetails    `json:"score_details,omitempty"`
+		Metrics      interface{}             `json:"metrics"`
+	}
+
+	result := make(map[string]*EngineStatusResponse)
+
+	for name, state := range engineStates {
+		resp := &EngineStatusResponse{
+			Name:     name,
+			Status:   state.Status.String(),
+			Priority: state.Priority,
+			Metrics:  state.Metrics,
+		}
+
+		if quota, ok := quotaStatus[name]; ok {
+			resp.QuotaStatus = string(quota.Status)
+			resp.QuotaHealth = quota.Health
+			resp.MonthlyUsed = quota.MonthlyUsed
+			resp.MonthlyLimit = quota.MonthlyLimit
+			resp.IsFree = quota.IsFree
+		}
+
+		// 如果提供了查询，计算得分
+		if query != "" {
+			details := t.router.GetScorer().ScoreWithDetails(name, query)
+			resp.Score = details.FinalScore
+			resp.ScoreDetails = details
+		}
+
+		result[name] = resp
+	}
+
+	return map[string]interface{}{
+		"engines":         result,
+		"current_strategy": t.config.Router.Strategy,
+		"query":           query,
+	}, nil
+}
+
+// handleGetQuotaReport 处理获取配额报告请求
+func (t *WebSearchTool) handleGetQuotaReport(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	quotaStatus := t.router.GetQuotaManager().GetAllQuotaStatus()
+
+	// 计算总体统计
+	var totalUsed, totalLimit int64
+	var freeCount, paidCount int
+	var exhaustedEngines []string
+	var warningEngines []string
+
+	for name, quota := range quotaStatus {
+		if quota.IsFree {
+			freeCount++
+		} else {
+			paidCount++
+			totalUsed += quota.MonthlyUsed
+			totalLimit += quota.MonthlyLimit
+		}
+
+		switch quota.Status {
+		case router.QuotaExhausted:
+			exhaustedEngines = append(exhaustedEngines, name)
+		case router.QuotaWarning, router.QuotaCritical:
+			warningEngines = append(warningEngines, name)
+		}
+	}
+
+	return map[string]interface{}{
+		"quotas": quotaStatus,
+		"summary": map[string]interface{}{
+			"total_paid_engines":  paidCount,
+			"total_free_engines":  freeCount,
+			"total_paid_used":     totalUsed,
+			"total_paid_limit":    totalLimit,
+			"exhausted_engines":   exhaustedEngines,
+			"warning_engines":     warningEngines,
+		},
+	}, nil
+}
+
+// handleClassifyQuery 处理查询分类请求
+func (t *WebSearchTool) handleClassifyQuery(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	query, _ := args["query"].(string)
+	if query == "" {
+		return nil, fmt.Errorf("query is required")
+	}
+
+	// 分类查询
+	classification := t.router.GetClassifier().Classify(query)
+
+	// 获取各引擎得分
+	scores := t.router.GetEngineScores(query)
+
+	// 按得分排序推荐引擎
+	type engineScore struct {
+		Name  string  `json:"name"`
+		Score float64 `json:"score"`
+	}
+	var recommendations []engineScore
+	for name, details := range scores {
+		recommendations = append(recommendations, engineScore{name, details.FinalScore})
+	}
+	// 排序
+	for i := 0; i < len(recommendations)-1; i++ {
+		for j := i + 1; j < len(recommendations); j++ {
+			if recommendations[i].Score < recommendations[j].Score {
+				recommendations[i], recommendations[j] = recommendations[j], recommendations[i]
+			}
+		}
+	}
+
+	return map[string]interface{}{
+		"query":           query,
+		"classification":  classification,
+		"recommendations": recommendations,
+	}, nil
 }

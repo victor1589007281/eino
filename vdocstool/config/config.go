@@ -14,8 +14,112 @@ type Config struct {
 	Email     EmailConfig     `json:"email"`
 	Memory    MemoryConfig    `json:"memory"`
 	JobSearch JobSearchConfig `json:"jobsearch"`
+	Finance   FinanceConfig   `json:"finance"`
+	OCR       OCRConfig       `json:"ocr"`
 	MCP       MCPConfig       `json:"mcp"`
 	Logging   LoggingConfig   `json:"logging"`
+}
+
+// OCRConfig OCR 工具配置
+type OCRConfig struct {
+	// 是否启用
+	Enabled bool `json:"enabled"`
+	// 最大内存使用 (MB)
+	MaxMemoryMB int `json:"max_memory_mb"`
+	// 空闲超时 (秒)
+	IdleTimeoutSec int `json:"idle_timeout_sec"`
+	// 常驻引擎
+	ResidentEngines []string `json:"resident_engines"`
+	// CPU 线程数
+	NumThreads int `json:"num_threads"`
+	// 是否启用 MKL-DNN 加速
+	EnableMKLDNN bool `json:"enable_mkl_dnn"`
+	// 默认路由策略: quality_first, cost_first, speed_first, smart
+	DefaultStrategy string `json:"default_strategy"`
+	// 降级链
+	FallbackChain []string `json:"fallback_chain"`
+	// Tesseract 配置
+	Tesseract TesseractConfig `json:"tesseract"`
+	// RapidOCR 服务配置
+	RapidOCR RapidOCRConfig `json:"rapidocr"`
+	// PaddleOCR 服务配置
+	PaddleOCR PaddleOCRConfig `json:"paddleocr"`
+	// 云服务配置
+	Cloud CloudOCRConfig `json:"cloud"`
+	// VLM 配置
+	VLM VLMOCRConfig `json:"vlm"`
+}
+
+// TesseractConfig Tesseract 配置
+type TesseractConfig struct {
+	Path      string   `json:"path"`
+	Languages []string `json:"languages"`
+	DataDir   string   `json:"data_dir"`
+}
+
+// RapidOCRConfig RapidOCR 配置
+type RapidOCRConfig struct {
+	Enabled  bool   `json:"enabled"`
+	Endpoint string `json:"endpoint"`
+}
+
+// PaddleOCRConfig PaddleOCR 配置
+type PaddleOCRConfig struct {
+	Enabled  bool   `json:"enabled"`
+	Endpoint string `json:"endpoint"`
+	ModelDir string `json:"model_dir"`
+}
+
+// CloudOCRConfig 云 OCR 配置
+type CloudOCRConfig struct {
+	Baidu   BaiduOCRConfig   `json:"baidu"`
+	Tencent TencentOCRConfig `json:"tencent"`
+}
+
+// BaiduOCRConfig 百度 OCR 配置
+type BaiduOCRConfig struct {
+	Enabled   bool   `json:"enabled"`
+	APIKey    string `json:"api_key"`
+	SecretKey string `json:"secret_key"`
+}
+
+// TencentOCRConfig 腾讯 OCR 配置
+type TencentOCRConfig struct {
+	Enabled   bool   `json:"enabled"`
+	SecretID  string `json:"secret_id"`
+	SecretKey string `json:"secret_key"`
+	Region    string `json:"region"`
+}
+
+// VLMOCRConfig VLM OCR 配置
+type VLMOCRConfig struct {
+	QwenAPIKey   string `json:"qwen_api_key"`
+	OpenAIAPIKey string `json:"openai_api_key"`
+	ClaudeAPIKey string `json:"claude_api_key"`
+}
+
+// FinanceConfig 财经工具配置
+type FinanceConfig struct {
+	// 是否启用
+	Enabled bool `json:"enabled"`
+	// Redis URL (用于缓存)
+	RedisURL string `json:"redis_url"`
+	// 数据源配置
+	Sources FinanceSourcesConfig `json:"sources"`
+}
+
+// FinanceSourcesConfig 财经数据源配置
+type FinanceSourcesConfig struct {
+	// 东方财富配置
+	EastMoney FinanceSourceConfig `json:"eastmoney"`
+	// 新浪财经配置
+	Sina FinanceSourceConfig `json:"sina"`
+}
+
+// FinanceSourceConfig 单个数据源配置
+type FinanceSourceConfig struct {
+	Enabled   bool `json:"enabled"`
+	RateLimit int  `json:"rate_limit"` // 每秒请求数
 }
 
 // JobSearchConfig 招聘搜索配置
@@ -298,6 +402,47 @@ func DefaultConfig() *Config {
 				TimeDecayFactor: 0.95,
 			},
 		},
+		Finance: FinanceConfig{
+			Enabled:  true,
+			RedisURL: "redis://localhost:6379",
+			Sources: FinanceSourcesConfig{
+				EastMoney: FinanceSourceConfig{
+					Enabled:   true,
+					RateLimit: 10,
+				},
+				Sina: FinanceSourceConfig{
+					Enabled:   true,
+					RateLimit: 10,
+				},
+			},
+		},
+		OCR: OCRConfig{
+			Enabled:         true,
+			MaxMemoryMB:     1500,
+			IdleTimeoutSec:  300,
+			ResidentEngines: []string{"rapidocr"},
+			NumThreads:      4,
+			EnableMKLDNN:    false,
+			DefaultStrategy: "smart",
+			FallbackChain:   []string{"rapidocr", "tesseract", "baidu"},
+			Tesseract: TesseractConfig{
+				Path:      "tesseract",
+				Languages: []string{"chi_sim", "eng"},
+			},
+			RapidOCR: RapidOCRConfig{
+				Enabled:  false,
+				Endpoint: "http://localhost:8089",
+			},
+			PaddleOCR: PaddleOCRConfig{
+				Enabled:  false,
+				Endpoint: "http://localhost:8866",
+			},
+			Cloud: CloudOCRConfig{
+				Baidu:   BaiduOCRConfig{Enabled: false},
+				Tencent: TencentOCRConfig{Enabled: false, Region: "ap-guangzhou"},
+			},
+			VLM: VLMOCRConfig{},
+		},
 		MCP: MCPConfig{
 			ServerName:    "agent-tools",
 			ServerVersion: "1.0.0",
@@ -447,5 +592,38 @@ func (c *Config) LoadFromEnv() {
 	// MCP
 	if v := os.Getenv("MCP_LISTEN_ADDR"); v != "" {
 		c.MCP.ListenAddr = v
+	}
+
+	// Finance
+	if v := os.Getenv("FINANCE_REDIS_URL"); v != "" {
+		c.Finance.RedisURL = v
+	}
+
+	// OCR
+	if v := os.Getenv("OCR_ENABLED"); v == "false" {
+		c.OCR.Enabled = false
+	}
+	if v := os.Getenv("BAIDU_OCR_API_KEY"); v != "" {
+		c.OCR.Cloud.Baidu.APIKey = v
+		c.OCR.Cloud.Baidu.Enabled = true
+	}
+	if v := os.Getenv("BAIDU_OCR_SECRET_KEY"); v != "" {
+		c.OCR.Cloud.Baidu.SecretKey = v
+	}
+	if v := os.Getenv("TENCENT_OCR_SECRET_ID"); v != "" {
+		c.OCR.Cloud.Tencent.SecretID = v
+		c.OCR.Cloud.Tencent.Enabled = true
+	}
+	if v := os.Getenv("TENCENT_OCR_SECRET_KEY"); v != "" {
+		c.OCR.Cloud.Tencent.SecretKey = v
+	}
+	if v := os.Getenv("QWEN_API_KEY"); v != "" {
+		c.OCR.VLM.QwenAPIKey = v
+	}
+	if v := os.Getenv("OPENAI_API_KEY"); v != "" {
+		c.OCR.VLM.OpenAIAPIKey = v
+	}
+	if v := os.Getenv("ANTHROPIC_API_KEY"); v != "" {
+		c.OCR.VLM.ClaudeAPIKey = v
 	}
 }

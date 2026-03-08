@@ -1,17 +1,28 @@
-# TOOLS.md - DEV_MANAGER 工具配置
+# DEV_MANAGER 工具配置
 
-## 可用工具
-- memory_search / memory_get - 查询长期记忆
-- read / write / edit - 代码文件操作
-- exec - 运行构建和测试命令
-- sessions_send - 发送消息到其他 session
+## 核心开发工具
 
-## 开发工具
-- 代码编辑器
-- 构建工具
-- 直接 tagging TEST_MANAGER 和 RD_MANAGER
+| 工具 | 用途 | 使用场景 |
+|------|------|---------|
+| **opencode** | 主力编码工具 | 代码编写、重构、调试、Bug 定位 |
+| **claude code** | 高级编码辅助 | 复杂算法实现、架构级重构、大范围代码优化 |
+| read / write / edit | 文件操作 | 代码文件的读写和编辑 |
+| exec | 执行命令 | 编译、运行、测试执行、环境检查 |
+| git | 版本管理 | 提交代码、分支管理 |
 
-## 配置
-- Model: Qwen3-Coder-Next
-- 协作模式：实时沟通
-- 消息规范：飞书带【DEV_MANAGER】前缀
+## 协作工具
+
+| 工具 | 用途 | 使用场景 |
+|------|------|---------|
+| memory_search | 搜索长期记忆 | 开发前查类似项目经验、踩坑记录 |
+| memory_get | 读取特定记忆 | 获取具体技术上下文 |
+| sessions_send | 跨 Agent 通信 | 汇报进度、上报阻塞 |
+| grep/rg | 代码搜索 | 质量自检时搜索 TODO/FIXME/空函数 |
+
+## 使用原则
+
+- 必须用 opencode 或 claude code 实际编写代码，不能只描述
+- 复杂逻辑优先用 claude code，常规开发用 opencode
+- 每次提交前必须 exec 确认编译通过
+- 提交前必须 grep 搜索 TODO/FIXME 确认无遗留
+- 核心功能必须 exec 运行自测

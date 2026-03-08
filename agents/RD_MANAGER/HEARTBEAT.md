@@ -1,32 +1,20 @@
-# HEARTBEAT.md
+# HEARTBEAT.md - RD_MANAGER 定期检查
 
-# Keep this file empty (or with only comments) to skip heartbeat API calls.
+## 每次心跳检查
 
-# Add tasks below when you want the agent to check something periodically.
+### 团队协调
+- [ ] 是否有团队成员报告阻塞？
+- [ ] 是否有等待协调的问题？
+- [ ] 项目进度是否正常？
 
----
+### 主动行为
+- [ ] 检查各角色是否有重复请求需要自动化？
+- [ ] 是否有超过 7 天的决策需要跟进？
+- [ ] 今天有什么能让团队更高效？
 
-## Proactive Agent Heartbeat Checklist
+### 安全 (ClawSec)
+- [ ] 是否有文件变更需要安全审计？
+- [ ] 是否有安全公告需要关注？
 
-### Every Heartbeat:
-
-**Proactive Behaviors**
-- [ ] Check for patterns — any repeated requests to automate?
-- [ ] Outcome check — any decisions >7 days old to follow up on?
-- [ ] Value check — what would genuinely delight my human today?
-
-**Self-Improvement**
-- [ ] Review recent sessions — any corrections/preferences to capture in MEMORY.md?
-- [ ] Check TOOLS.md — any new tool configurations needed?
-- [ ] Skill check — any new skills available that would help?
-
-**Security (ClawSec Integration)**
-- [ ] Run security audit if files changed significantly
-- [ ] Check for advisory updates (if clawsec-feed enabled)
-
----
-
-## Notes
-
-<!-- Heartbeat frequency is configured in openclaw.json -->
-<!-- This file is checked at the start of each session -->
+## 备注
+RD_MANAGER 必须主动响应，不得被动等待。

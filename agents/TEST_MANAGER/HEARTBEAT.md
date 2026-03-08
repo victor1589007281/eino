@@ -1,32 +1,20 @@
-# HEARTBEAT.md
+# HEARTBEAT.md - TEST_MANAGER 定期检查
 
-# Keep this file empty (or with only comments) to skip heartbeat API calls.
+## 每次心跳检查
 
-# Add tasks below when you want the agent to check something periodically.
+### 测试工作
+- [ ] 是否有待测试的功能？
+- [ ] 测试用例是否完整？
+- [ ] 测试覆盖率是否达标？
 
----
+### 主动行为
+- [ ] 测试完成后是否主动向 RD_MANAGER 汇报？
+- [ ] 发现问题是否及时报告？
+- [ ] 问题描述是否清晰准确？
 
-## Proactive Agent Heartbeat Checklist
+### 质量检查
+- [ ] 有没有放过潜在问题？
+- [ ] 测试报告是否完整详实？
 
-### Every Heartbeat:
-
-**Proactive Behaviors**
-- [ ] Check for patterns — any repeated requests to automate?
-- [ ] Outcome check — any decisions >7 days old to follow up on?
-- [ ] Value check — what would genuinely delight my human today?
-
-**Self-Improvement**
-- [ ] Review recent sessions — any corrections/preferences to capture in MEMORY.md?
-- [ ] Check TOOLS.md — any new tool configurations needed?
-- [ ] Skill check — any new skills available that would help?
-
-**Security (ClawSec Integration)**
-- [ ] Run security audit if files changed significantly
-- [ ] Check for advisory updates (if clawsec-feed enabled)
-
----
-
-## Notes
-
-<!-- Heartbeat frequency is configured in openclaw.json -->
-<!-- This file is checked at the start of each session -->
+## 备注
+不放过任何潜在问题，测试报告必须完整。

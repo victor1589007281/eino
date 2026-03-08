@@ -24,18 +24,16 @@
 
 ## API 可靠性评分
 
-> 每周日自动汇总更新
+> 每周日自动汇总更新。仅包含中国大陆可达的免费 API。
 
 | API | 评分 | 备注 | 更新日期 |
 |-----|------|------|---------|
-| pollinations | - | 初始化，待数据积累 | - |
-| siliconflow-image-gen | - | 初始化 | - |
-| gemini-image-gen | - | 初始化 | - |
-| fal-ai | - | 初始化 | - |
-| krea-api | - | 初始化 | - |
-| video-gen (即梦) | - | 初始化 | - |
-| video-gen (可灵) | - | 初始化 | - |
+| siliconflow-image-gen | - | 初始化，Flux-Schnell 免费 | - |
+| video-gen (即梦) | - | 初始化，每日 66 积分 | - |
+| video-gen (可灵) | - | 初始化，每月 366 积分 | - |
 | siliconflow-video-gen | - | 初始化 | - |
+
+已排除（中国大陆不可达或已付费）：Pollinations、Google Gemini、fal.ai、krea
 
 ## 错误模式库
 

@@ -1,15 +1,16 @@
 ---
 name: api-fallback-guard
-version: 1.0.0
+version: 2.0.0
 author: mediacraft
 description: |
-  API 免费额度降级守卫。当任何外部 API 返回收费、配额耗尽、限流错误时，
+  API 免费额度降级守卫（中国大陆版）。当任何外部 API 返回收费、配额耗尽、限流错误时，
   自动识别并返回降级信号。所有 Worker Sub-Agent 的任务指令中必须引用此技能的规则。
   此技能不直接调用任何工具，它是一套错误识别和降级决策的标准规范。
+  已移除海外不可达或已付费 API：Pollinations、Google Gemini、fal.ai、krea。
 tools: Read
 ---
 
-# API 免费额度降级守卫
+# API 免费额度降级守卫（中国大陆版）
 
 ## 核心原则
 
@@ -39,32 +40,29 @@ credit, balance, subscription, upgrade, plan_limit
 套餐, 升级, 限流, 请求过多, 积分不足, 灵感值不足
 ```
 
-## 降级链定义
+## 降级链定义（仅中国大陆可达 API）
 
 ### 文生图
 
 ```
-Chain: pollinations → siliconflow-image-gen → gemini-image-gen → fal-ai → krea-api → EXHAUSTED
+Chain: siliconflow-image-gen → 百炼视觉理解(qwen3.5-plus) → EXHAUSTED
 ```
 
 | 顺序 | Skill | 免费额度 | 说明 |
 |-----|-------|---------|------|
-| 1 | pollinations | 无限 | 完全免费，质量中等 |
-| 2 | siliconflow-image-gen | Schnell 免费 | 国内快，Flux 质量 |
-| 3 | gemini-image-gen | 250 请求/天 | Google 免费层 |
-| 4 | fal-ai | 注册免费额度 | 600+ 模型，质量最高 |
-| 5 | krea-api | 有限免费 | Imagen4/Ideogram3 |
+| 1 | siliconflow-image-gen | Schnell 免费 | 国内快，Flux 质量 |
+| 2 | 百炼视觉理解 | Coding Plan 包含 | 阿里百炼，质量中等 |
 
 ### 图生图（编辑/风格转换）
 
 ```
-Chain: gemini-image-gen → krea-api → fal-ai → EXHAUSTED
+Chain: siliconflow-image-gen → EXHAUSTED
 ```
 
 ### 文生视频
 
 ```
-Chain: video-gen(jimeng) → video-gen(kling) → siliconflow-video-gen → ai-video-generation → EXHAUSTED
+Chain: video-gen(jimeng) → video-gen(kling) → siliconflow-video-gen → EXHAUSTED
 ```
 
 | 顺序 | Skill (Provider) | 免费额度 |
@@ -72,7 +70,6 @@ Chain: video-gen(jimeng) → video-gen(kling) → siliconflow-video-gen → ai-v
 | 1 | video-gen (即梦) | 每日 66 积分 |
 | 2 | video-gen (可灵) | 每月 366 积分 |
 | 3 | siliconflow-video-gen | 注册免费额度 |
-| 4 | ai-video-generation | 按模型 |
 
 ### 图生视频
 
@@ -151,11 +148,11 @@ Chain: video-gen(kling-i2v) → video-gen(jimeng-i2v) → siliconflow-video-gen 
 
 ```
 本次会话 API 状态：
-  [IMG] pollinations: ✅
-  [IMG] siliconflow-image-gen: ❌ (14:30 quota exceeded)
-  [IMG] gemini-image-gen: ✅
+  [IMG] siliconflow-image-gen: ✅
+  [IMG] 百炼视觉理解: ✅
   [VID] video-gen(jimeng): ✅
   [VID] video-gen(kling): ⚠️ (剩余约 50 积分)
+  [VID] siliconflow-video-gen: ✅
 ```
 
 后续请求直接跳过已标记 ❌ 的 API，节省重试时间。

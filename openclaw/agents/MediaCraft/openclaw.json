@@ -1,0 +1,210 @@
+{
+  // ═══════════════════════════════════════════════════════════════════════════
+  // OpenClaw 多 Agent 主配置 v5 - 中国大陆版
+  // 17 个独立 Agent：mediacraft + 7 研发 + 6 金融 + 小红书 + 公众号 + 邮件
+  // 中国大陆可用 API（无 Google/fal.ai/krea/Pollinations）
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // ─── 全局 LLM ───
+  "agent": {
+    "model": "dashscope/qwen3.5-plus",
+    "fallbackModels": [
+      "dashscope/qwen3-coder-plus",
+      "dashscope/kimi-k2.5",
+      "deepseek/deepseek-chat"
+    ],
+    "name": "OpenClaw",
+    "theme": "17 Agent 智能助手平台 - 飞书集成",
+    "emoji": "🦾"
+  },
+
+  // ─── 多用户会话隔离 ───
+  "session": {
+    "dmScope": "per-channel-peer"
+  },
+
+  // ─── 安全 ───
+  "security": {
+    "sensitiveData": {
+      "patterns": ["sk-*", "key-*", "token-*", "secret-*", "*_API_KEY", "*_SECRET"]
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 17 个 Agent
+  // ═══════════════════════════════════════════════════════════════════════════
+  "agents": {
+    "defaults": {
+      "bootstrapMaxChars": 20000,
+      "maxContextTokens": 128000,
+      "maxResponseTokens": 8192,
+      "temperature": 0.7,
+      "compaction": { "memoryFlush": true },
+      "subagents": {
+        "maxSpawnDepth": 2,
+        "maxChildrenPerAgent": 6,
+        "maxConcurrent": 12
+      },
+      "sandbox": {
+        "mode": "non-main",
+        "docker": {
+          "env": {
+            "DASHSCOPE_API_KEY": "${DASHSCOPE_API_KEY}",
+            "SILICONFLOW_API_KEY": "${SILICONFLOW_API_KEY}",
+            "DEEPSEEK_API_KEY": "${DEEPSEEK_API_KEY}",
+            "TUSHARE_TOKEN": "${TUSHARE_TOKEN}"
+          }
+        }
+      }
+    },
+    "list": [
+      // ─── 多媒体 ───
+      { "id": "mediacraft",   "default": true, "workspace": "~/.openclaw/agents/mediacraft/workspace" },
+
+      // ─── 研发团队（7 个独立 Agent）───
+      { "id": "rd-pm",        "workspace": "~/.openclaw/agents/rd-pm/workspace" },
+      { "id": "rd-architect", "workspace": "~/.openclaw/agents/rd-architect/workspace" },
+      { "id": "rd-backend",   "workspace": "~/.openclaw/agents/rd-backend/workspace" },
+      { "id": "rd-frontend",  "workspace": "~/.openclaw/agents/rd-frontend/workspace" },
+      { "id": "rd-qa",        "workspace": "~/.openclaw/agents/rd-qa/workspace" },
+      { "id": "rd-devops",    "workspace": "~/.openclaw/agents/rd-devops/workspace" },
+      { "id": "rd-doc",       "workspace": "~/.openclaw/agents/rd-doc/workspace" },
+
+      // ─── 金融团队（6 个独立 Agent）───
+      { "id": "fin-analyst",  "workspace": "~/.openclaw/agents/fin-analyst/workspace" },
+      { "id": "fin-picker",   "workspace": "~/.openclaw/agents/fin-picker/workspace" },
+      { "id": "fin-monitor",  "workspace": "~/.openclaw/agents/fin-monitor/workspace" },
+      { "id": "fin-trader",   "workspace": "~/.openclaw/agents/fin-trader/workspace" },
+      { "id": "fin-research", "workspace": "~/.openclaw/agents/fin-research/workspace" },
+      { "id": "fin-risk",     "workspace": "~/.openclaw/agents/fin-risk/workspace" },
+
+      // ─── 内容运营 ───
+      { "id": "xiaohongshu",  "workspace": "~/.openclaw/agents/xiaohongshu/workspace" },
+      { "id": "wechat-mp",    "workspace": "~/.openclaw/agents/wechat-mp/workspace" },
+
+      // ─── 邮件 ───
+      { "id": "email-mgr",    "workspace": "~/.openclaw/agents/email-mgr/workspace" }
+    ]
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 飞书路由 Bindings
+  //
+  // 路由策略：
+  //   群聊 → bindings 静态绑定（一个群绑一个 Agent）
+  //   私聊 → 默认走 mediacraft，用户可通过关键词切换
+  //
+  // 部署前：将 oc_xxx 占位符替换为真实飞书群 ID
+  //   获取方式：openclaw logs --follow → 发送消息后看日志中的 peer.id
+  // ═══════════════════════════════════════════════════════════════════════════
+  "bindings": [
+    // ─── 研发项目群（一个项目群一组 Agent，绑到 PM 作为入口）───
+    // PM 收到消息后可通过 sessions_send 协调其他研发 Agent
+    { "agentId": "rd-pm",        "match": { "channel": "feishu", "peer": { "kind": "group", "id": "oc_rd_project_alpha" } } },
+    { "agentId": "rd-pm",        "match": { "channel": "feishu", "peer": { "kind": "group", "id": "oc_rd_project_beta" } } },
+
+    // ─── 研发专项群（可选：架构评审群、测试群等）───
+    { "agentId": "rd-architect", "match": { "channel": "feishu", "peer": { "kind": "group", "id": "oc_rd_architecture_review" } } },
+    { "agentId": "rd-qa",        "match": { "channel": "feishu", "peer": { "kind": "group", "id": "oc_rd_qa_group" } } },
+    { "agentId": "rd-devops",    "match": { "channel": "feishu", "peer": { "kind": "group", "id": "oc_rd_devops_group" } } },
+
+    // ─── 金融群（绑到首席分析师作为入口）───
+    { "agentId": "fin-analyst",  "match": { "channel": "feishu", "peer": { "kind": "group", "id": "oc_finance_main" } } },
+
+    // ─── 金融专项群（可选）───
+    { "agentId": "fin-monitor",  "match": { "channel": "feishu", "peer": { "kind": "group", "id": "oc_finance_monitor" } } },
+    { "agentId": "fin-risk",     "match": { "channel": "feishu", "peer": { "kind": "group", "id": "oc_finance_risk" } } },
+
+    // ─── 内容运营群 ───
+    { "agentId": "xiaohongshu",  "match": { "channel": "feishu", "peer": { "kind": "group", "id": "oc_xiaohongshu_group" } } },
+    { "agentId": "wechat-mp",    "match": { "channel": "feishu", "peer": { "kind": "group", "id": "oc_wechat_group" } } },
+
+    // ─── 多媒体群 ───
+    { "agentId": "mediacraft",   "match": { "channel": "feishu", "peer": { "kind": "group", "id": "oc_mediacraft_group" } } },
+
+    // ─── 邮件群 ───
+    { "agentId": "email-mgr",    "match": { "channel": "feishu", "peer": { "kind": "group", "id": "oc_email_group" } } },
+
+    // ─── 私聊 fallback（默认到 mediacraft）───
+    { "agentId": "mediacraft",   "match": { "channel": "feishu" } }
+  ],
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Skills（中国大陆可用 API，已移除 Google/fal.ai/krea/Pollinations）
+  // ═══════════════════════════════════════════════════════════════════════════
+  "skills": {
+    "allowBundled": [],
+    "load": {
+      "extraDirs": ["~/.openclaw/skills"],
+      "watch": true,
+      "watchDebounceMs": 250
+    },
+    "entries": {
+      // ─── 安全 ───
+      "secure-install":           { "enabled": true },
+      "clawsec-suite":            { "enabled": true },
+
+      // ─── OCR（本地，无需外部 API）───
+      "smart-ocr":                { "enabled": true, "env": { "OCR_USE_GPU": "false", "OCR_LANG": "ch,en,japan,korean" } },
+      "pdf-text-extractor":       { "enabled": true },
+
+      // ─── 文生图（仅国内可达 API）───
+      "siliconflow-image-gen":    { "enabled": true, "env": { "SILICONFLOW_API_KEY": "${SILICONFLOW_API_KEY}" } },
+
+      // ─── 文/图生视频（即梦/可灵/硅基流动，全部国内直连）───
+      "video-gen":                { "enabled": true, "env": { "KLING_API_KEY": "${KLING_API_KEY}", "JIMENG_API_KEY": "${JIMENG_API_KEY}" } },
+      "siliconflow-video-gen":    { "enabled": true, "env": { "SILICONFLOW_API_KEY": "${SILICONFLOW_API_KEY}" } },
+
+      // ─── 金融（Tushare + Yahoo 均国内可达）───
+      "tushare-finance":          { "enabled": true, "env": { "TUSHARE_TOKEN": "${TUSHARE_TOKEN}" } },
+      "yahoofinance":             { "enabled": true },
+      "stock-analysis":           { "enabled": true },
+      "portfolio-watcher":        { "enabled": true },
+
+      // ─── 内容运营 ───
+      "xiaohongshu":              { "enabled": true },
+      "wechat-accounts-publisher": { "enabled": true },
+      "clawhub-publish":          { "enabled": true },
+
+      // ─── 邮件 ───
+      "imap-smtp-email":          { "enabled": true },
+
+      // ─── 研发 ───
+      "github":                   { "enabled": true },
+
+      // ─── 工具 ───
+      "memory-tools":             { "enabled": true },
+      "prompt-enhancer":          { "enabled": true },
+      "smart-router":             { "enabled": true },
+      "backup-and-restore":       { "enabled": true },
+      "multi-user-workspace":     { "enabled": true },
+
+      // ─── 自定义 ───
+      "children-growth-handbook": { "enabled": true, "env": { "DASHSCOPE_API_KEY": "${DASHSCOPE_API_KEY}", "DEFAULT_STYLE": "forest_watercolor" } },
+      "api-fallback-guard":       { "enabled": true }
+    }
+  },
+
+  // ─── 输出目录 ───
+  "output": {
+    "baseDir": "~/.openclaw/workspace/output",
+    "images": "~/.openclaw/workspace/output/images",
+    "videos": "~/.openclaw/workspace/output/videos",
+    "handbooks": "~/.openclaw/workspace/output/handbooks"
+  },
+
+  // ─── 飞书 Channel ───
+  "channels": {
+    "feishu": {
+      "enabled": true,
+      "dmPolicy": "pairing",
+      "accounts": {
+        "main": {
+          "appId": "${FEISHU_APP_ID}",
+          "appSecret": "${FEISHU_APP_SECRET}",
+          "botName": "OpenClaw AI"
+        }
+      }
+    }
+  }
+}

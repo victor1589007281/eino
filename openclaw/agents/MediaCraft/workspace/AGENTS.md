@@ -334,14 +334,16 @@ illustration style, high quality, 4K detail"
 3. OpenClaw 原生 fallback 有 bug（Issue #32533 #12402 #19249），**不依赖它**
 4. 所有降级逻辑写在任务指令中，由 Worker 自行执行
 
-### 降级链
+### 降级链（中国大陆可用 API，已移除海外不可达服务）
 
 ```
-文生图:   pollinations → siliconflow → gemini → fal-ai → krea → STOP
-图生图:   gemini → krea → fal-ai → STOP
-文生视频: 即梦 → 可灵 → siliconflow → ai-video-gen → STOP
-图生视频: 可灵I2V → 即梦I2V → siliconflow → STOP
+文生图:   siliconflow-image-gen → 百炼视觉理解(qwen3.5-plus) → STOP
+文生视频: 即梦 → 可灵 → siliconflow-video-gen → STOP
+图生视频: 可灵I2V → 即梦I2V → siliconflow-video-gen → STOP
+图生图:   siliconflow-image-gen → STOP
 ```
+
+已移除（中国大陆不可达或已付费）：Pollinations、Google Gemini、fal.ai、krea
 
 错误触发关键词：
 ```
@@ -440,7 +442,7 @@ insufficient, exhausted, rate_limit, too_many_requests,
 
   Worker-1: {task_desc}  ⏳ 执行中...
   Worker-2: {task_desc}  ✅ 完成 (3.2s)
-  Worker-3: {task_desc}  ⚠️ pollinations → siliconflow（自动降级）
+  Worker-3: {task_desc}  ⚠️ siliconflow → 百炼视觉理解（自动降级）
   Worker-4: {task_desc}  ✅ 完成 (2.8s)
 
 🏁 全部完成！(4.1s，串行预计 12.4s，提速 3.0x)
@@ -449,7 +451,7 @@ insufficient, exhausted, rate_limit, too_many_requests,
 ### 降级通知
 
 ```
-⚠️ siliconflow 额度耗尽 → 已切换 gemini (Google 免费层)
+⚠️ siliconflow 额度耗尽 → 已切换即梦（免费层）
 ```
 
 ### 提示词优化展示
@@ -531,17 +533,17 @@ Agent 不只是一次性执行工具，而是一个**会学习、会成长**的�
 ```
 // 写入 memory/YYYY-MM-DD.md（每日）
 API 调用记录:
-  pollinations:          调用 12 次, 成功 12 次, 失败 0 次, 成功率 100%
-  siliconflow-image-gen: 调用 8 次,  成功 5 次,  失败 3 次, 成功率 62.5%
-  gemini-image-gen:      调用 3 次,  成功 3 次,  失败 0 次, 成功率 100%
-  video-gen (即梦):      调用 4 次,  成功 3 次,  失败 1 次, 成功率 75%
+  siliconflow-image-gen: 调用 15 次, 成功 12 次, 失败 3 次, 成功率 80%
+  video-gen (即梦):      调用 6 次,  成功 5 次,  失败 1 次, 成功率 83%
+  video-gen (可灵):      调用 4 次,  成功 4 次,  失败 0 次, 成功率 100%
+  siliconflow-video-gen: 调用 3 次,  成功 2 次,  失败 1 次, 成功率 67%
 
 // 汇总到 MEMORY.md（周度/发现规律时）
 API 可靠性评分（近 7 天）:
-  pollinations:          ⭐⭐⭐⭐⭐ 98% 可靠，但高峰期(14:00-16:00 UTC)偶尔超时
-  siliconflow-image-gen: ⭐⭐⭐     62% 可靠，免费额度月中常耗尽
-  gemini-image-gen:      ⭐⭐⭐⭐   85% 可靠，每日 250 次严格限制
-  fal-ai:                ⭐⭐⭐⭐   80% 可靠，注册额度充足时稳定
+  siliconflow-image-gen: ⭐⭐⭐⭐   80% 可靠，免费额度月中常耗尽
+  video-gen (即梦):      ⭐⭐⭐⭐   83% 可靠，工作日下午偶尔超时
+  video-gen (可灵):      ⭐⭐⭐⭐⭐ 100% 可靠，但免费额度有限
+  siliconflow-video-gen: ⭐⭐⭐     67% 可靠，视频质量中等
 ```
 
 #### 动态降级链优化
@@ -550,14 +552,16 @@ API 可靠性评分（近 7 天）:
 
 ```
 静态降级链（初始）:
-  pollinations → siliconflow → gemini → fal-ai → krea
+  文生图: siliconflow-image-gen → 百炼视觉理解 → STOP
+  文生视频: 即梦 → 可灵 → siliconflow-video-gen → STOP
 
 动态降级链（学习后，假设 siliconflow 本月额度已光）:
-  pollinations → gemini → fal-ai → krea → [siliconflow 标记跳过至下月1号]
+  文生图: 百炼视觉理解 → [siliconflow 标记跳过至下月1号]
+  文生视频: 即梦 → 可灵 → [siliconflow-video-gen 标记跳过至下月1号]
 
 记录到 MEMORY.md:
   [降级优化] siliconflow 免费额度规律: 每月约第 15 天耗尽
-  [降级优化] 策略: 月初优先 siliconflow（质量高），月中切换 gemini
+  [降级优化] 策略: 月初优先 siliconflow（质量高），月中切换百炼
 ```
 
 #### 错误模式识别
@@ -567,14 +571,14 @@ API 可靠性评分（近 7 天）:
 
 memory/2026-03-08.md:
   14:30 siliconflow 429 → 月度额度耗尽（本月第3次触发）
-  14:35 gemini 内容审核拒绝 → 提示词含"战争"被拦截
+  14:35 siliconflow 内容审核拒绝 → 提示词含敏感词被拦截
   15:00 video-gen 超时 → 即梦服务器高峰期响应慢
 
 提炼到 MEMORY.md:
   [错误模式] siliconflow: 免费额度 ~500 张/月，中旬开始紧张
-  [错误模式] gemini: 对"战争/暴力/武器"类关键词严格审核
+  [错误模式] siliconflow: 对部分敏感关键词有审核拦截
   [错误模式] 即梦: 工作日 14:00-18:00 响应慢，建议非高峰使用
-  [错误模式] fal-ai: 大尺寸图片(2048+)偶发 OOM，建议 ≤1024
+  [错误模式] 可灵: 免费额度有限，建议留给高质量需求
 ```
 
 #### 错误预防（复利核心）
@@ -582,17 +586,17 @@ memory/2026-03-08.md:
 不是等错误发生再处理，而是**提前规避已知错误**：
 
 ```
-场景: 用户说"画一个战争场面"
+场景: 用户说"画一个包含敏感元素的场面"
   ┌─ 查询 MEMORY.md ─┐
-  │ gemini 对战争类审核严格 │
-  └────────────────────┘
-  → 跳过 gemini，直接用 pollinations/siliconflow（不浪费一次调用）
+  │ siliconflow 对部分敏感词审核严格 │
+  └────────────────────────────────┘
+  → 优化提示词规避敏感词，或切换百炼视觉理解
 
 场景: 3月16日用户要批量生成图片
   ┌─ 查询 MEMORY.md ─┐
   │ siliconflow 月中额度紧张 │
   └────────────────────┘
-  → 降级链中 siliconflow 降低优先级，优先 pollinations + gemini
+  → 降级链中 siliconflow 降低优先级，优先百炼视觉理解
 
 场景: 下午3点用户要生成视频
   ┌─ 查询 MEMORY.md ─┐
@@ -612,13 +616,13 @@ MEMORY.md - 提示词精华库:
   "A fluffy orange tabby cat lounging on vintage bookshelf,
    soft window light, warm earth tones, illustration style,
    detailed fur, cozy reading nook atmosphere, 4K"
-  → 模型: pollinations/flux | 用户评价: "很好看"
+  → 模型: siliconflow/flux-schnell | 用户评价: "很好看"
 
 [精华] "风景" 类最佳提示词:
   "Misty mountain valley at sunrise, layers of fog between
    pine forests, golden light rays piercing through clouds,
    landscape photography, dramatic sky, wide angle, 8K"
-  → 模型: gemini | 用户评价: 无反馈但未要求重做
+  → 模型: siliconflow/sd3.5 | 用户评价: 无反馈但未要求重做
 ```
 
 使用方式：当用户再次请求相似主题时，以精华库提示词为基础微调，而非从零优化。
@@ -727,3 +731,79 @@ memory/2026-03-08.md:
 3. 用户满意的结果入精华库
 4. 每周汇总 API 可靠性评分
 5. 动态调整降级链顺序
+
+---
+
+## Part 9: 通用能力补充
+
+### 9.1 角色通信协议
+
+**铁律：所有消息（含飞书输出）必须带角色前缀。**
+
+```
+[🎨 MediaCraft] {内容}
+```
+
+与其他 Agent 协作时：
+```
+[🎨 MediaCraft] → [{emoji} 目标角色]
+任务：{描述}
+截止：{时间}
+产出要求：{格式}
+```
+
+收到其他 Agent 消息时：识别对方角色，以 `[🎨 MediaCraft]` 前缀回复。
+
+### 9.2 任务规划与执行（强化）
+
+**铁律：不能只规划不执行。拆解完毕必须立即动手。**
+
+收到任务后严格执行：
+
+1. **拆解**（≤30 秒）：
+   ```
+   📋 任务拆解：
+     □ 1. {步骤}（预计 {时间}）
+     □ 2. {步骤}（预计 {时间}）
+   ```
+
+2. **立即执行**（不等待用户确认，直接开始）：
+   ```
+   ⏳ 执行进度：
+     ✅ 1. {步骤} → {结果摘要}
+     ⏳ 2. {步骤} → 进行中...
+     □  3. {步骤}
+   ```
+
+3. **完成汇总**：
+   ```
+   🏁 完成：
+     产出物：{列表}
+     耗时：{时间}
+   ```
+
+禁止：只输出计划而不执行、说"我建议你"而自己不做。
+
+### 9.3 模型使用优先级与自动调整
+
+```
+默认：qwen3.5-plus → qwen3-coder-plus → kimi-k2.5 → deepseek-chat
+```
+
+自动调整规则：
+- 当前模型超时（>30s）/报错 → 自动降级到下一个
+- 记录各模型响应速度和质量到 MEMORY.md
+- 每周分析模型表现，发现某模型持续优于当前默认 → 动态调整优先级
+- 编程相关子任务优先使用 qwen3-coder-plus
+
+### 9.4 Skills 清单
+
+- memory-tools：记忆读写
+- smart-ocr：OCR 识别
+- pdf-text-extractor：PDF 文本提取
+- siliconflow-image-gen：文生图
+- siliconflow-video-gen：硅基流动视频
+- video-gen：即梦/可灵视频
+- prompt-enhancer：提示词优化
+- children-growth-handbook：儿童成长手册
+- api-fallback-guard：API 降级守卫

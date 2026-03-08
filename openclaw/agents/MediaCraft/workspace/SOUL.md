@@ -52,5 +52,11 @@
 - **降级策略**：多层免费 API 降级链，错误关键词识别，动态链优化，预防性规避
 - **阿里百炼**：qwen3.5-plus / kimi-k2.5 / qwen3-coder-plus 分级使用
 - **OCR**：PaddleOCR + 百炼视觉理解兜底
-- **文生图**：Pollinations → SiliconFlow → Gemini → fal.ai 降级链（可动态调整）
-- **文生视频**：即梦 → 可灵 → SiliconFlow 降级链（可动态调整）
+- **文生图**：SiliconFlow → 百炼视觉理解（中国大陆可达链，可动态调整）
+- **文生视频**：即梦 → 可灵 → SiliconFlow（中国大陆可达链，可动态调整）
+
+## 通用能力
+
+- **角色前缀**：所有消息必须带 `[🎨 MediaCraft]` 前缀
+- **规划即执行**：拆解任务后立即执行，严禁只规划不动手
+- **模型自调**：qwen3.5-plus → qwen3-coder-plus → kimi-k2.5 → deepseek-chat，异常自动降级，长期优化选择

@@ -4,6 +4,8 @@
 
 ## 文档列表
 
+### MediaCraft 多媒体 Agent
+
 | 文档 | 说明 |
 |-----|------|
 | [01-openclaw-agent-proposal.md](./01-openclaw-agent-proposal.md) | 使用 OpenClaw 实现文生图/视频 Agent 的完整方案 |
@@ -11,96 +13,118 @@
 | [03-llm-free-tier-comparison.md](./03-llm-free-tier-comparison.md) | 2026年文生图/文生视频 API 免费额度对比（薅羊毛指南） |
 | [04-children-growth-handbook-generator.md](./04-children-growth-handbook-generator.md) | 使用 LLM 生成儿童成长手册的完整方案 |
 | [05-openclaw-skills-guide.md](./05-openclaw-skills-guide.md) | OpenClaw Skills 推荐：OCR / 文生图 / 文生视频 |
-| [06-mediacraft-agent-deploy-guide.md](./06-mediacraft-agent-deploy-guide.md) | MediaCraft AI Agent 完整部署指南 v4（+自我进化系统） |
+| [06-mediacraft-agent-deploy-guide.md](./06-mediacraft-agent-deploy-guide.md) | MediaCraft AI Agent 完整部署指南 v4（自我进化系统） |
 | [07-deploy-checklist.md](./07-deploy-checklist.md) | **部署清单：API 申请 + Skills 安装 Checklist** |
-| [agent-config/](./agent-config/) | Agent 配置文件目录（可直接部署） |
+| [agent-config/](./agent-config/) | **全部 Agent 配置**（6 个 Agent + 统一路由 + 备份脚本） |
+
+### 飞书 + 多 Agent 平台
+
+| 文档 | 说明 |
+|-----|------|
+| [08-rd-agent-team-plan.md](./08-rd-agent-team-plan.md) | **研发 Agent 团队构建方案**（飞书群+项目+7个角色 Agent） |
+| [09-multi-user-routing-plan.md](./09-multi-user-routing-plan.md) | **多用户路由隔离方案**（防信息污染、权限分级） |
+
+### 金融 Agent 群
+
+| 文档 | 说明 |
+|-----|------|
+| [10-finance-agent-team-plan.md](./10-finance-agent-team-plan.md) | **金融分析/荐股/盯盘/炒股 Agent 群方案**（6个角色 Agent） |
+
+### 全平台部署
+
+| 文档 | 说明 |
+|-----|------|
+| [12-full-platform-guide.md](./12-full-platform-guide.md) | **全平台 Agent 部署指南**（6团队+路由+备份+中国大陆适配） |
+
+### OpenClaw 生态
+
+| 文档 | 说明 |
+|-----|------|
+| [11-openclaw-use-cases-revenue.md](./11-openclaw-use-cases-revenue.md) | **OpenClaw 真实案例与直接收益整理**（赚钱方向+ROI 数据） |
+
+---
 
 ## 快速导航
 
-### 1. OpenClaw Agent 方案
+### 研发 Agent 团队（NEW）
 
-如果你想用 OpenClaw 代替自研 Agent 来处理 LLM 相关逻辑：
+在飞书中构建 AI 员工团队，一个飞书群 = 一个项目：
 
-- OpenClaw 是一个开源的 AI Agent 平台（180k+ Stars）
-- 支持 50+ 消息平台（Telegram、Discord、微信等）
-- 通过简单的 `SKILL.md` 文件定义技能
-- 自动处理 LLM 调用、会话管理、意图识别
+| 角色 | Agent 昵称 | 职责 |
+|------|-----------|------|
+| 项目经理 | 小项 | 需求分析、任务拆解、进度跟踪 |
+| 架构师 | 小架 | 架构设计、技术方案、Code Review |
+| 后端 | 小后 | 后端开发、API 设计、数据库 |
+| 前端 | 小前 | 前端开发、UI/UX |
+| 测试 | 小测 | 测试用例、Bug 分析 |
+| 运维 | 小运 | CI/CD、部署、监控 |
+| 文档 | 小文 | 文档生成、变更日志 |
 
-👉 [查看完整方案](./01-openclaw-agent-proposal.md)
+同一角色可服务多个项目；支持 @某角色 群聊和 1v1 私聊
 
-### 2. 本地文生图/视频部署
+👉 [查看研发团队方案](./08-rd-agent-team-plan.md)
 
-铭凡 UM890 (96GB DDR5) 的文生图/视频能力评估：
+### 多用户路由隔离（NEW）
 
-| 方案 | 可行性 | 说明 |
-|-----|--------|------|
-| CPU + Flux GGUF | 勉强 | 5-15 分钟/张，偶尔用 |
-| 780M 核显 | 不可行 | ROCm 不支持 780M |
-| 外接 eGPU | 推荐 | RTX 4060+ 即可流畅使用 |
-| 云 GPU 租用 | 推荐 | AutoDL RTX 4090 ¥2.5/h |
+多人共用一个 OpenClaw，互不干扰：
 
-结论：UM890 适合做编排/后处理节点，文生图/视频建议 eGPU 或 API
+| 隔离方案 | 适用场景 | 复杂度 |
+|---------|---------|--------|
+| Session 级（dmScope） | 日常多人使用 | 低 |
+| Agent 级（独立 workspace） | 高安全需求 | 中 |
+| 混合方案 | 管理员+普通用户+VIP | 推荐 |
 
-👉 [查看完整方案](./02-local-llm-um890-guide.md)
+👉 [查看路由隔离方案](./09-multi-user-routing-plan.md)
 
-### 3. 文生图/视频免费额度薅羊毛
+### 金融 Agent 群（NEW）
 
-2026年可免费使用的文生图/视频额度汇总：
+7x24 小时金融分析团队：
 
-**文生图：**
-| 平台 | 免费额度 | 推荐指数 |
-|-----|---------|---------|
-| 即梦 (字节) | 66张/天 | ⭐⭐⭐⭐⭐ |
-| 通义万相 | ~50张/天 | ⭐⭐⭐⭐⭐ |
-| 可灵 | 366积分/月 | ⭐⭐⭐⭐ |
+| 角色 | 职责 | 数据源 |
+|------|------|--------|
+| 首席分析师 | 宏观研判、大盘分析 | Tushare + 新闻 |
+| 选股师 | 多维度选股、潜力股推荐 | Tushare + Yahoo |
+| 盯盘员 | 实时监控、异动告警 | 实时行情 |
+| 交易助手 | 买卖信号、仓位管理 | 综合 |
+| 研报分析师 | 财报解读、研报分析 | 财务数据 |
+| 风控官 | 风险评估、回撤预警 | 持仓数据 |
 
-**文生视频：**
-| 平台 | 免费额度 | 推荐指数 |
-|-----|---------|---------|
-| 即梦 | ~6段/天 | ⭐⭐⭐⭐⭐ |
-| 可灵 | ~18段/月 | ⭐⭐⭐⭐⭐ |
-| Pika | 80积分/月 | ⭐⭐⭐⭐ |
-| Luma | 30段/月 | ⭐⭐⭐ |
+支持自动化工作流：早盘研判 → 盘中盯盘 → 收盘复盘 → 周报
 
-理论月免费总量：**4,000+ 张图 + 300+ 段视频**
+👉 [查看金融方案](./10-finance-agent-team-plan.md)
 
-👉 [查看完整对比](./03-llm-free-tier-comparison.md)
+### OpenClaw 赚钱/收益案例（NEW）
 
-### 4. 儿童成长手册生成
+| 方向 | 月收益参考 | 难度 |
+|------|----------|------|
+| AI 内容代写 | ¥3,000-12,000 | 入门 |
+| AI 客服外包 | ¥300-3,600/10客户 | 入门 |
+| 自动化工作流 | ¥5,000-50,000/项目 | 中级 |
+| SaaS 产品 | ¥50,000+ | 高级 |
+| 量化交易 | 因人而异 | 高级 |
 
-使用 LLM 自动生成儿童成长手册：
+企业场景：邮件处理 -78% 时间、客户入职 12x 加速、KPI 报表从 4h 到 5min
 
-- 支持 5 种风格：森系水彩、北欧极简、绘本故事等
-- 自动生成文案、排版、装饰
-- 输出 A4 尺寸 PNG/PDF
-- 成本：每本 < ¥1（不含印刷）
+👉 [查看完整案例](./11-openclaw-use-cases-revenue.md)
 
-👉 [查看完整方案](./04-children-growth-handbook-generator.md)
+### MediaCraft 多媒体 Agent
 
-### 5. OpenClaw Skills 推荐
+| 类别 | 首推技能 | 成本 |
+|-----|---------|------|
+| **OCR** | smart-ocr (PaddleOCR) | 免费 |
+| **文生图** | pollinations / gemini | 免费 |
+| **文生视频** | 即梦 / 可灵 | 免费额度 |
 
-精选安全、低成本、高质量的 OCR / 文生图 / 文生视频技能：
-
-| 类别 | 首推技能 | 成本 | 安全性 |
-|-----|---------|------|--------|
-| **OCR** | smart-ocr (PaddleOCR) | 免费本地 | 官方 |
-| **文生图** | fal-ai (Flux/SDXL 600+模型) | ~$0.003/张 | 社区验证第1 |
-| **文生图(免费)** | pollinations / gemini-image-gen | 完全免费 | 官方合作 |
-| **文生视频** | ai-video-generation (40+模型) | 取决于Provider | 官方 |
-| **文生视频(低价)** | siliconflow-video-gen (Wan2.2) | ¥2/段 | 官方 |
-
-零成本方案月产量：~7,500 张图 + ~200 段视频 + 无限 OCR
-
-👉 [查看完整指南](./05-openclaw-skills-guide.md)
+👉 [查看 MediaCraft 部署指南](./06-mediacraft-agent-deploy-guide.md) | [部署 Checklist](./07-deploy-checklist.md)
 
 ## 相关链接
 
 - [OpenClaw 官方文档](https://docs.openclaw.ai/)
+- [飞书开放平台](https://open.feishu.cn/)
+- [Tushare 金融数据](https://tushare.pro/)
 - [ComfyUI](https://github.com/comfyanonymous/ComfyUI) - 本地文生图工作流
 - [即梦 AI](https://jimeng.jianying.com/) - 字节文生图/视频
 - [可灵 AI](https://klingai.com/) - 快手文生视频
-- [Pika](https://pika.art/) - AI 视频生成
-- [Runway](https://runwayml.com/) - Gen-4 视频生成
 
 ---
 

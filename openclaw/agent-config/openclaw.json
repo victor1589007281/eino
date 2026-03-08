@@ -1,0 +1,142 @@
+{
+  // ═══════════════════════════════════════════════════════════
+  // MediaCraft AI Agent - OpenClaw 主配置 v4
+  // 核心变更：自我进化记忆系统 / 阿里百炼 / Swarm 并发 / 免费API降级链
+  // ═══════════════════════════════════════════════════════════
+
+  "agent": {
+    // 主 LLM：阿里百炼 Coding Plan（用户已购买）
+    // 包含 qwen3.5-plus, kimi-k2.5, glm-5, MiniMax-M2.5 等
+    "model": "dashscope/qwen3.5-plus",
+
+    // Fallback：百炼内其他模型 → DeepSeek 免费额度
+    "fallbackModels": [
+      "dashscope/qwen3-coder-plus",
+      "dashscope/kimi-k2.5",
+      "deepseek/deepseek-chat"
+    ],
+
+    "name": "MediaCraft",
+    "theme": "专业多媒体 AI 创作助手 - Swarm 并发架构",
+    "emoji": "🎨"
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // 安全
+  // ═══════════════════════════════════════════════════════════
+  "security": {
+    "sensitiveData": {
+      "patterns": ["sk-*", "key-*", "token-*", "secret-*"]
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // Sub-Agent 并发配置（Swarm 模式）
+  // ═══════════════════════════════════════════════════════════
+  "agents": {
+    "defaults": {
+      "bootstrapMaxChars": 20000,
+      "maxContextTokens": 128000,
+      "maxResponseTokens": 8192,
+      "temperature": 0.7,
+
+      // ── 记忆持久化：上下文压缩前自动刷写重要信息到 MEMORY.md ──
+      "compaction": {
+        "memoryFlush": true
+      },
+
+      // ── Sub-Agent 并发参数 ──
+      "subagents": {
+        // 最大嵌套深度（Coordinator → Worker 两层足够）
+        "maxSpawnDepth": 2,
+        // 单个 Agent 最大同时子任务
+        "maxChildrenPerAgent": 6,
+        // 全局并发上限（避免同时 API 调用过多触发限流）
+        "maxConcurrent": 10
+      },
+
+      "sandbox": {
+        "mode": "non-main",
+        "docker": {
+          "env": {
+            "DASHSCOPE_API_KEY": "${DASHSCOPE_API_KEY}",
+            "FAL_KEY": "${FAL_KEY}",
+            "GEMINI_API_KEY": "${GEMINI_API_KEY}",
+            "SILICONFLOW_API_KEY": "${SILICONFLOW_API_KEY}",
+            "DEEPSEEK_API_KEY": "${DEEPSEEK_API_KEY}"
+          }
+        }
+      }
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // Skills 配置
+  // ═══════════════════════════════════════════════════════════
+  "skills": {
+    "allowBundled": [],
+
+    "load": {
+      "extraDirs": ["~/.openclaw/skills"],
+      "watch": true,
+      "watchDebounceMs": 250
+    },
+
+    "entries": {
+      // ──── 安全 ────
+      "secure-install": { "enabled": true },
+      "clawsec-suite": { "enabled": true },
+
+      // ──── OCR ────
+      "smart-ocr": {
+        "enabled": true,
+        "env": { "OCR_USE_GPU": "false", "OCR_LANG": "ch,en,japan,korean" }
+      },
+      "pdf-text-extractor": { "enabled": true },
+
+      // ──── 文生图（全部免费/免费层，按降级链排列） ────
+      "pollinations":          { "enabled": true },
+      "siliconflow-image-gen": { "enabled": true, "env": { "SILICONFLOW_API_KEY": "${SILICONFLOW_API_KEY}" } },
+      "gemini-image-gen":      { "enabled": true, "env": { "GEMINI_API_KEY": "${GEMINI_API_KEY}" } },
+      "fal-ai":                { "enabled": true, "env": { "FAL_KEY": "${FAL_KEY}" } },
+      "krea-api":              { "enabled": true, "env": { "KREA_API_KEY": "${KREA_API_KEY}" } },
+
+      // ──── 文/图生视频（全部免费/免费层） ────
+      "video-gen":              { "enabled": true, "env": { "KLING_API_KEY": "${KLING_API_KEY}", "JIMENG_API_KEY": "${JIMENG_API_KEY}" } },
+      "siliconflow-video-gen":  { "enabled": true, "env": { "SILICONFLOW_API_KEY": "${SILICONFLOW_API_KEY}" } },
+      "ai-video-generation":    { "enabled": true },
+
+      // ──── 提示词优化 ────
+      "prompt-enhancer": {
+        "enabled": true
+      },
+
+      // ──── 记忆与进化 ────
+      "memory-tools": {
+        "enabled": true
+      },
+
+      // ──── 自定义 ────
+      "children-growth-handbook": {
+        "enabled": true,
+        "env": {
+          "DASHSCOPE_API_KEY": "${DASHSCOPE_API_KEY}",
+          "DEFAULT_STYLE": "forest_watercolor"
+        }
+      },
+      "api-fallback-guard": {
+        "enabled": true
+      }
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // 输出
+  // ═══════════════════════════════════════════════════════════
+  "output": {
+    "baseDir": "~/.openclaw/workspace/output",
+    "images": "~/.openclaw/workspace/output/images",
+    "videos": "~/.openclaw/workspace/output/videos",
+    "handbooks": "~/.openclaw/workspace/output/handbooks"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "id": "@team/collab",
+  "name": "Multi-Agent Collaboration",
+  "version": "1.0.0",
+  "description": "V5 协作系统插件：任务管理 + 项目管理 + Agent 注册 + 飞书通道 + Dashboard + 记忆同步",
+  "main": "dist/index.js",
+  "config": {
+    "goServiceUrl": {
+      "type": "string",
+      "description": "Go collaboration service URL",
+      "default": "http://localhost:8090"
+    },
+    "feishuEnabled": {
+      "type": "boolean",
+      "description": "Enable Feishu relay",
+      "default": true
+    },
+    "contextMaxTokens": {
+      "type": "number",
+      "description": "Max tokens for injected collaboration context",
+      "default": 3000
+    }
+  },
+  "hooks": [
+    "before_agent_start",
+    "message_sending",
+    "before_tool_call",
+    "after_tool_call",
+    "agent_end",
+    "before_compaction"
+  ],
+  "tools": [
+    "create_task",
+    "update_task",
+    "query_tasks",
+    "save_artifact",
+    "create_project",
+    "save_decision",
+    "query_project_memory"
+  ],
+  "commands": [
+    "/status",
+    "/pause",
+    "/tasks"
+  ]
+}

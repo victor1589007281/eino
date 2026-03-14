@@ -1,0 +1,26 @@
+{
+  "name": "@team/collab",
+  "version": "1.0.0",
+  "description": "OpenClaw Multi-Agent Collaboration Plugin",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest --coverage",
+    "lint": "eslint src/ --ext .ts"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.0",
+    "@types/jest": "^29.5.0",
+    "typescript": "^5.6.0"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.3.13"
+  }
+}

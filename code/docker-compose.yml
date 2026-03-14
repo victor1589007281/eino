@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: collab-postgres
+    environment:
+      POSTGRES_USER: collab
+      POSTGRES_PASSWORD: collab
+      POSTGRES_DB: collab
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./go-collab-service/migrations/000001_init.up.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U collab"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  go-service:
+    build:
+      context: ./go-collab-service
+      dockerfile: Dockerfile
+    container_name: collab-go-service
+    environment:
+      PORT: "8090"
+      DATABASE_DSN: "host=postgres user=collab password=collab dbname=collab port=5432 sslmode=disable"
+      OPENCLAW_DIR: "/openclaw"
+      DEFAULT_BOT_ID: "${DEFAULT_BOT_ID:-}"
+      FEISHU_APP_ID: "${FEISHU_APP_ID:-}"
+      FEISHU_APP_SECRET: "${FEISHU_APP_SECRET:-}"
+      GIN_MODE: "release"
+    ports:
+      - "8090:8090"
+    volumes:
+      - ${OPENCLAW_DIR:-~/.openclaw}:/openclaw:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8090/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  ts-plugin:
+    build:
+      context: ./ts-plugins/collab
+      dockerfile: Dockerfile
+    container_name: collab-ts-plugin
+    image: collab-ts-plugin:latest
+    entrypoint: ["echo", "Plugin built. Copy dist/ to OpenClaw plugins dir."]
+
+volumes:
+  pgdata:

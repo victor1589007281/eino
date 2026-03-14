@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS bot_mappings;
+DROP TABLE IF EXISTS agent_experiences;
+DROP TABLE IF EXISTS artifacts;
+DROP TABLE IF EXISTS task_activities;
+DROP TABLE IF EXISTS tasks;
+DROP TABLE IF EXISTS project_memories;
+DROP TABLE IF EXISTS iterations;
+DROP TABLE IF EXISTS projects;
+DROP TABLE IF EXISTS agent_records;

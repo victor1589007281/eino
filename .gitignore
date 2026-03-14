@@ -47,3 +47,12 @@ output/*
 # Ignore vdocsMysql data directory
 vdocsMysql/data/
 
+# Node
+node_modules/
+
+# TS build output
+code/ts-plugins/collab/dist/
+
+# Go build output
+code/go-collab-service/bin/
+

@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: go-service-config
+  namespace: collab
+data:
+  PORT: "8090"
+  DATABASE_DSN: "host=postgres user=collab password=collab dbname=collab port=5432 sslmode=disable"
+  GIN_MODE: "release"
+  OPENCLAW_DIR: "/openclaw"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go-service
+  namespace: collab
+  labels:
+    app: go-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: go-service
+  template:
+    metadata:
+      labels:
+        app: go-service
+    spec:
+      initContainers:
+        - name: wait-postgres
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z postgres 5432; do echo "waiting for postgres..."; sleep 2; done']
+      containers:
+        - name: go-service
+          image: collab-go-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8090
+          envFrom:
+            - configMapRef:
+                name: go-service-config
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-service
+  namespace: collab
+spec:
+  selector:
+    app: go-service
+  ports:
+    - port: 8090
+      targetPort: 8090
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-service-nodeport
+  namespace: collab
+spec:
+  selector:
+    app: go-service
+  ports:
+    - port: 8090
+      targetPort: 8090
+      nodePort: 30090
+  type: NodePort

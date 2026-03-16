@@ -56,3 +56,47 @@ code/ts-plugins/collab/dist/
 # Go build output
 code/go-collab-service/bin/
 
+# Compressed files
+*.tar.gz
+*.zip
+*.gz
+*.rar
+*.7z
+
+# Model files
+*.bge-m3*
+Modelfile*
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+
+# Log files
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files (keep existing)
+.idea/
+*.iml
+.vscode/
+.trae/
+
+# Secrets and credentials (important!)
+*.pem
+*.key
+*.crt
+*.secret
+*.credentials
+*secret*.json
+*credentials*.json
+
+# K8s secrets
+**/k8s/secret.yaml
+**/secrets.yaml
+

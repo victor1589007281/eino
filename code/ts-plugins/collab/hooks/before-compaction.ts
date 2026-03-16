@@ -3,8 +3,7 @@ import type { BeforeCompactionEvent } from "../types.js";
 
 export function createBeforeCompactionHook(bridge: GoBridge) {
   return async (event: BeforeCompactionEvent): Promise<void> => {
-    const { agentId, sessionKey } = event || {};
-    if (!agentId || !sessionKey) return;
+    const { agentId, sessionKey } = event;
 
     const projectId = extractProjectId(sessionKey);
     if (!projectId) return;
@@ -37,7 +36,6 @@ export function createBeforeCompactionHook(bridge: GoBridge) {
 }
 
 function extractProjectId(sessionKey: string): string | null {
-  if (!sessionKey || typeof sessionKey !== "string") return null;
   const parts = sessionKey.split(":");
   for (const part of parts) {
     if (part.startsWith("oc_")) return part;

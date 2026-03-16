@@ -1,9 +1,6 @@
 import type { GoBridge } from "../go-bridge.js";
 import type { BeforeToolCallEvent, BeforeToolCallResult } from "../types.js";
 
-// 存储当前会话的 channelId (sessionKey -> channelId)
-const sessionChannelMap = new Map<string, string>();
-
 const MONITORED_TOOLS = new Set([
   "sessions_spawn",
   "sessions_send",
@@ -12,9 +9,9 @@ const MONITORED_TOOLS = new Set([
 
 export function createBeforeToolCallHook(bridge: GoBridge) {
   return async (event: BeforeToolCallEvent): Promise<BeforeToolCallResult> => {
-    const { agentId, sessionKey, toolName, params } = event || {};
+    const { agentId, sessionKey, toolName, params } = event;
 
-    if (!agentId || !toolName || !MONITORED_TOOLS.has(toolName)) {
+    if (!MONITORED_TOOLS.has(toolName)) {
       return {};
     }
 
@@ -29,15 +26,6 @@ export function createBeforeToolCallHook(bridge: GoBridge) {
         return {};
     }
   };
-}
-
-// 导出用于设置 channelId 的函数
-export function setSessionChannel(sessionKey: string, channelId: string) {
-  sessionChannelMap.set(sessionKey, channelId);
-}
-
-export function getSessionChannel(sessionKey: string): string | undefined {
-  return sessionChannelMap.get(sessionKey);
 }
 
 async function handleSpawn(

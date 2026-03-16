@@ -10,9 +10,9 @@ const MONITORED_TOOLS = new Set([
 
 export function createAfterToolCallHook(bridge: GoBridge) {
   return async (event: AfterToolCallEvent): Promise<void> => {
-    const { agentId, toolName, params, result, error } = event || {};
+    const { agentId, toolName, params, result, error } = event;
 
-    if (!agentId || !toolName || !MONITORED_TOOLS.has(toolName)) return;
+    if (!MONITORED_TOOLS.has(toolName)) return;
 
     if (error) {
       try {

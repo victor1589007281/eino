@@ -68,10 +68,11 @@ func (h *Handler) GetByGroup(c *gin.Context) {
 	gid := c.Param("group_id")
 	p, err := h.svc.GetByGroup(gid)
 	if err != nil {
-		common.ErrorResponse(c, http.StatusNotFound, "project not found for group")
+		// 404 means no project bound, return empty response
+		c.JSON(http.StatusOK, gin.H{"project": nil})
 		return
 	}
-	c.JSON(http.StatusOK, p)
+	c.JSON(http.StatusOK, gin.H{"project": p})
 }
 
 func (h *Handler) GetContext(c *gin.Context) {

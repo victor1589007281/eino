@@ -4,6 +4,9 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -64,8 +67,174 @@ type Project struct {
 	Status      string      `json:"status" gorm:"default:'active'"` // active / paused / archived
 	TeamAgents  StringSlice `json:"team_agents" gorm:"type:jsonb;default:'[]'"`
 	TechStack   StringSlice `json:"tech_stack" gorm:"type:jsonb;default:'[]'"`
-	CreatedAt   time.Time   `json:"created_at"`
-	UpdatedAt   time.Time   `json:"updated_at"`
+	// 仓库信息（JSON 存储，支持多个仓库）
+	Repositories  RepositoryConfig `json:"repositories" gorm:"type:jsonb"`
+	// 文档输出目录（绝对路径）
+	DocsBaseDir   string      `json:"docs_base_dir"`  // 文档根目录绝对路径，如：/home/victor/docs
+	CreatedAt     time.Time   `json:"created_at"`
+	UpdatedAt     time.Time   `json:"updated_at"`
+}
+
+// 仓库配置（支持多个仓库）
+type RepositoryConfig struct {
+	CodeRepos    []CodeRepository    `json:"code_repos"`     // 代码仓库列表
+	DocRepos     []DocRepository     `json:"doc_repos"`      // 文档仓库（可选）
+	ReferenceRepos []ReferenceRepository `json:"reference_repos"` // 参考源码仓库
+}
+
+// 验证仓库路径是否存在
+func (r *RepositoryConfig) Validate() error {
+	// 验证代码仓库
+	for i, repo := range r.CodeRepos {
+		if repo.Name == "" {
+			return fmt.Errorf("code_repos[%d]: name is required", i)
+		}
+		if repo.LocalPath == "" {
+			return fmt.Errorf("code_repos[%d]: local_path is required", i)
+		}
+		if !filepath.IsAbs(repo.LocalPath) {
+			return fmt.Errorf("code_repos[%d]: local_path must be absolute path, got: %s", i, repo.LocalPath)
+		}
+		// 在 K8s 环境中，路径需要映射到挂载的目录
+		// 检查路径是否在允许的 base 目录内
+		if !isPathInAllowedBase(repo.LocalPath) {
+			return fmt.Errorf("code_repos[%d]: path %s is not in allowed base directories", i, repo.LocalPath)
+		}
+		// 检查路径是否存在（在 K8s 中，这个检查可能会失败，因为目录可能还没挂载）
+		// 所以只警告，不阻止
+		if _, err := os.Stat(repo.LocalPath); os.IsNotExist(err) {
+			// 在 K8s 环境中，这可能是正常的（目录还未创建）
+			// 只记录警告，不返回错误
+			fmt.Printf("[WARN] code_repos[%d]: path does not exist yet: %s (may be created later)\n", i, repo.LocalPath)
+		}
+	}
+	
+	// 验证文档仓库
+	for i, repo := range r.DocRepos {
+		if repo.Name == "" {
+			return fmt.Errorf("doc_repos[%d]: name is required", i)
+		}
+		if repo.LocalPath == "" {
+			return fmt.Errorf("doc_repos[%d]: local_path is required", i)
+		}
+		if !filepath.IsAbs(repo.LocalPath) {
+			return fmt.Errorf("doc_repos[%d]: local_path must be absolute path, got: %s", i, repo.LocalPath)
+		}
+		if !isPathInAllowedBase(repo.LocalPath) {
+			return fmt.Errorf("doc_repos[%d]: path %s is not in allowed base directories", i, repo.LocalPath)
+		}
+	}
+	
+	// 验证参考仓库
+	for i, repo := range r.ReferenceRepos {
+		if repo.Name == "" {
+			return fmt.Errorf("reference_repos[%d]: name is required", i)
+		}
+		if repo.LocalPath == "" {
+			return fmt.Errorf("reference_repos[%d]: local_path is required", i)
+		}
+		if !filepath.IsAbs(repo.LocalPath) {
+			return fmt.Errorf("reference_repos[%d]: local_path must be absolute path, got: %s", i, repo.LocalPath)
+		}
+		if !isPathInAllowedBase(repo.LocalPath) {
+			return fmt.Errorf("reference_repos[%d]: path %s is not in allowed base directories", i, repo.LocalPath)
+		}
+	}
+	
+	return nil
+}
+
+// 检查路径是否在允许的 base 目录内
+// 在 K8s 环境中，只允许访问挂载的目录
+func isPathInAllowedBase(path string) bool {
+	// 允许的 base 目录列表
+	allowedBases := []string{
+		"/home/victor/base/git",      // K8s 挂载的 Git 仓库目录
+		"/home/victor/.openclaw",     // K8s 挂载的 OpenClaw 目录
+		"/tmp",                        // 临时目录
+		"/root/.openclaw",            // Pod 内的 OpenClaw 目录
+	}
+	
+	cleanPath := filepath.Clean(path)
+	
+	for _, base := range allowedBases {
+		// 检查路径是否以 base 开头
+		if strings.HasPrefix(cleanPath, base) {
+			// 确保是完整的目录名，不是前缀匹配
+			if cleanPath == base || strings.HasPrefix(cleanPath, base+"/") {
+				return true
+			}
+		}
+	}
+	
+	return false
+}
+
+// 获取主代码仓库
+func (r *RepositoryConfig) GetMainCodeRepo() *CodeRepository {
+	for _, repo := range r.CodeRepos {
+		if repo.Type == "main" {
+			return &repo
+		}
+	}
+	// 如果没有 main 类型，返回第一个
+	if len(r.CodeRepos) > 0 {
+		return &r.CodeRepos[0]
+	}
+	return nil
+}
+
+// 获取项目文档目录结构（返回绝对路径）
+func (p *Project) GetDocPaths() map[string]string {
+	baseDir := p.DocsBaseDir
+	if baseDir == "" {
+		baseDir = "/tmp/docs" // 默认值
+	}
+	
+	return map[string]string{
+		"designs":  filepath.Join(baseDir, p.ID, "designs"),   // 功能设计文档
+		"research": filepath.Join(baseDir, p.ID, "research"),  // 调研分析报告
+		"system":   filepath.Join(baseDir, p.ID, "system"),    // 模块实现文档
+		"reports":  filepath.Join(baseDir, p.ID, "reports"),   // AI 任务汇总报告
+	}
+}
+
+// 验证文档目录是否存在，不存在则创建
+func (p *Project) EnsureDocDirs() error {
+	docPaths := p.GetDocPaths()
+	for dirType, path := range docPaths {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			if err := os.MkdirAll(path, 0755); err != nil {
+				return fmt.Errorf("failed to create %s directory %s: %v", dirType, path, err)
+			}
+		}
+	}
+	return nil
+}
+
+// 代码仓库
+type CodeRepository struct {
+	Name       string `json:"name"`        // 仓库名称（如：backend, frontend）
+	Type       string `json:"type"`        // 类型：main（主仓库）, reference（参考仓库）
+	GitURL     string `json:"git_url"`     // Git 远程地址
+	LocalPath  string `json:"local_path"`  // 本地绝对路径
+	Branch     string `json:"branch"`      // 默认分支
+}
+
+// 文档仓库（可选，如果项目有独立文档仓库）
+type DocRepository struct {
+	Name      string `json:"name"`
+	GitURL    string `json:"git_url"`
+	LocalPath string `json:"local_path"`
+	Branch    string `json:"branch"`
+}
+
+// 参考源码仓库（如：参考的开源项目）
+type ReferenceRepository struct {
+	Name      string `json:"name"`        // 仓库名称
+	GitURL    string `json:"git_url"`     // Git 地址
+	LocalPath string `json:"local_path"`  // 本地绝对路径
+	Purpose   string `json:"purpose"`     // 用途说明
 }
 
 func (Project) TableName() string { return "projects" }
@@ -132,6 +301,88 @@ type Task struct {
 }
 
 func (Task) TableName() string { return "tasks" }
+
+// UnmarshalJSON implements custom JSON unmarshaling for Task
+// to support both camelCase and snake_case field names
+func (t *Task) UnmarshalJSON(data []byte) error {
+	// Create an alias type to avoid infinite recursion
+	type Alias Task
+	aux := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(t),
+	}
+	
+	// First try standard unmarshaling
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	
+	// Handle camelCase fallbacks if snake_case fields are empty
+	var raw map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err == nil {
+		// Check for camelCase variants and use them if snake_case is empty
+		if t.ProjectID == "" {
+			if v, ok := raw["projectId"].(string); ok {
+				t.ProjectID = v
+			}
+		}
+		if t.ParentID == nil {
+			if v, ok := raw["parentId"].(string); ok && v != "" {
+				t.ParentID = &v
+			}
+		}
+		if t.AssignedBy == "" {
+			if v, ok := raw["assignedBy"].(string); ok {
+				t.AssignedBy = v
+			}
+		}
+		if t.Deliverable == "" {
+			if v, ok := raw["deliverable"].(string); ok {
+				t.Deliverable = v
+			}
+		}
+		if t.Acceptance == "" {
+			if v, ok := raw["acceptance"].(string); ok {
+				t.Acceptance = v
+			}
+		}
+		if t.BlockReason == nil {
+			if v, ok := raw["blockReason"].(string); ok {
+				t.BlockReason = &v
+			}
+		}
+		if t.ErrorInfo == nil {
+			if v, ok := raw["errorInfo"].(string); ok {
+				t.ErrorInfo = &v
+			}
+		}
+		if t.DependsOn == nil || len(t.DependsOn) == 0 {
+			if v, ok := raw["dependsOn"].([]interface{}); ok {
+				dependsOn := make([]string, len(v))
+				for i, item := range v {
+					if s, ok := item.(string); ok {
+						dependsOn[i] = s
+					}
+				}
+				t.DependsOn = dependsOn
+			}
+		}
+		if t.Artifacts == nil || len(t.Artifacts) == 0 {
+			if v, ok := raw["artifacts"].([]interface{}); ok {
+				artifacts := make([]string, len(v))
+				for i, item := range v {
+					if s, ok := item.(string); ok {
+						artifacts[i] = s
+					}
+				}
+				t.Artifacts = artifacts
+			}
+		}
+	}
+	
+	return nil
+}
 
 // --- Task Activity ---
 

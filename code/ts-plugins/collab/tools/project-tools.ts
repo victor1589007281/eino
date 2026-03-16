@@ -1,9 +1,8 @@
 import type { GoBridge } from "../go-bridge.js";
-import type { ToolDefinition, ToolContext, CodeRepository } from "../types.js";
+import type { ToolDefinition, ToolContext } from "../types.js";
 
 export function createProjectTool(bridge: GoBridge): ToolDefinition {
   return {
-    name: "create_project",
     description: "Create a new project bound to a Feishu group.",
     parameters: {
       type: "object",
@@ -35,7 +34,6 @@ export function createProjectTool(bridge: GoBridge): ToolDefinition {
 
 export function createSaveDecisionTool(bridge: GoBridge): ToolDefinition {
   return {
-    name: "save_decision",
     description: "Save an important project decision, technical choice, lesson learned, or user directive to structured memory.",
     parameters: {
       type: "object",
@@ -69,7 +67,6 @@ export function createSaveDecisionTool(bridge: GoBridge): ToolDefinition {
 
 export function createQueryProjectMemoryTool(bridge: GoBridge): ToolDefinition {
   return {
-    name: "query_project_memory",
     description: "Search project memories by keyword or category.",
     parameters: {
       type: "object",
@@ -92,68 +89,6 @@ export function createQueryProjectMemoryTool(bridge: GoBridge): ToolDefinition {
           params.category
         );
         return JSON.stringify({ success: true, count: memories.length, memories: memories.slice(0, 10) });
-      } catch (err: any) {
-        return JSON.stringify({ success: false, error: err.message });
-      }
-    },
-  };
-}
-
-export function createQueryProjectInfoTool(bridge: GoBridge): ToolDefinition {
-  return {
-    name: "query_project_info",
-    description: "查询项目的基本信息，包括仓库路径、文档目录等。当需要保存文件到项目仓库时使用此工具。",
-    parameters: {
-      type: "object",
-      properties: {
-        project_id: { type: "string", description: "Project ID" },
-      },
-      required: ["project_id"],
-    },
-    async execute(params: Record<string, any>): Promise<string> {
-      try {
-        const project = await bridge.getProject(params.project_id);
-        if (!project) {
-          return JSON.stringify({ success: false, error: "Project not found" });
-        }
-        
-        // 构建文档目录路径
-        const docsBaseDir = project.docs_base_dir || "/tmp/docs";
-        const docPaths = {
-          designs: `${docsBaseDir}/${project.id}/designs`,   // 功能设计文档
-          research: `${docsBaseDir}/${project.id}/research`, // 调研分析报告
-          system: `${docsBaseDir}/${project.id}/system`,     // 模块实现文档
-          reports: `${docsBaseDir}/${project.id}/reports`,   // AI 任务汇总报告
-        };
-        
-        // 获取主代码仓库
-        const mainRepo = project.repositories?.code_repos?.find((r: CodeRepository) => r.type === "main") 
-                      || project.repositories?.code_repos?.[0];
-        
-        return JSON.stringify({
-          success: true,
-          project: {
-            id: project.id,
-            name: project.name,
-            docs_base_dir: docsBaseDir,
-            doc_paths: docPaths,
-            main_code_repo: mainRepo || null,
-            all_code_repos: project.repositories?.code_repos || [],
-            reference_repos: project.repositories?.reference_repos || [],
-          },
-          usage: {
-            save_design: `设计文档 → ${docPaths.designs}/<文档名>.md`,
-            save_research: `调研报告 → ${docPaths.research}/<报告名>.md`,
-            save_system: `模块文档 → ${docPaths.system}/<模块名>.md`,
-            save_report: `汇总报告 → ${docPaths.reports}/<报告名>.md`,
-            save_code: mainRepo ? `源代码 → ${mainRepo.local_path}/<模块>/<文件>.ts` : "未配置代码仓库",
-          },
-          guidance: [
-            "所有路径都是绝对路径，直接使用即可",
-            "保存文件前，先调用 save_artifact 工具将交付物保存到数据库",
-            "如果路径不存在或配置有误，会收到错误提示，请引导用户修正",
-          ],
-        });
       } catch (err: any) {
         return JSON.stringify({ success: false, error: err.message });
       }

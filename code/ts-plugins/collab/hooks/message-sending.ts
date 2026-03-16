@@ -1,23 +1,18 @@
 import type { GoBridge } from "../go-bridge.js";
 import type { MessageSendingEvent, MessageSendingResult } from "../types.js";
-import { setSessionChannel } from "./before-tool-call.js";
 
 const AGENT_HEADER_PATTERN = /^【.*?】/;
 
 export function createMessageSendingHook(bridge: GoBridge) {
   return async (event: MessageSendingEvent): Promise<MessageSendingResult> => {
-    const { agentId, sessionKey, content, channelId } = event || {};
+    const { agentId, sessionKey, content, channelId } = event;
 
-    // 保存 channelId 到 session 映射，供工具调用时使用
-    if (sessionKey && channelId) {
-      setSessionChannel(sessionKey, channelId);
-    }
-
-    if (!agentId || !content || AGENT_HEADER_PATTERN.test(content)) {
+    // Skip empty or already-formatted messages
+    if (!content || AGENT_HEADER_PATTERN.test(content)) {
       return {};
     }
 
-    const isSubagent = sessionKey && typeof sessionKey === "string" ? sessionKey.includes(":subagent:") : false;
+    const isSubagent = sessionKey.includes(":subagent:");
     const parentAgentId = isSubagent ? extractParentAgentId(sessionKey) : undefined;
     const subagentName = isSubagent ? extractSubagentName(sessionKey) : undefined;
 

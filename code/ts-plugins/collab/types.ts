@@ -2,10 +2,7 @@
 // These mirror the OpenClaw plugin-sdk interfaces for type safety
 
 export interface PluginApi {
-  registerTool(
-    factory: (() => ToolDefinition | ToolDefinition[]) | ToolDefinition,
-    opts: { names: string[] }
-  ): void;
+  registerTool(tool: ToolDefinition, opts?: { name?: string }): void;
   on(hookName: string, handler: (...args: any[]) => any, opts?: { priority?: number }): void;
   registerCommand(cmd: CommandDefinition): void;
   registerService(svc: ServiceDefinition): void;
@@ -14,7 +11,6 @@ export interface PluginApi {
 }
 
 export interface ToolDefinition {
-  name?: string;
   description: string;
   parameters: Record<string, any>;
   execute(params: Record<string, any>, context: ToolContext): Promise<string>;
@@ -24,7 +20,6 @@ export interface ToolContext {
   agentId: string;
   sessionKey: string;
   projectId?: string;
-  channelId?: string;  // 飞书群聊 ID (oc_开头)
 }
 
 export interface CommandDefinition {
@@ -151,42 +146,6 @@ export interface Project {
   status: string;
   team_agents: string[];
   tech_stack: string[];
-  // 仓库配置（JSON）
-  repositories?: RepositoryConfig;
-  // 文档输出根目录（绝对路径）
-  docs_base_dir?: string;
-}
-
-// 仓库配置
-export interface RepositoryConfig {
-  code_repos?: CodeRepository[];        // 代码仓库列表
-  doc_repos?: DocRepository[];          // 文档仓库（可选）
-  reference_repos?: ReferenceRepository[]; // 参考源码仓库
-}
-
-// 代码仓库
-export interface CodeRepository {
-  name: string;       // 仓库名称
-  type: string;       // main | reference
-  git_url: string;    // Git 远程地址
-  local_path: string; // 本地绝对路径
-  branch?: string;    // 默认分支
-}
-
-// 文档仓库
-export interface DocRepository {
-  name: string;
-  git_url: string;
-  local_path: string;
-  branch?: string;
-}
-
-// 参考源码仓库
-export interface ReferenceRepository {
-  name: string;
-  git_url: string;
-  local_path: string;
-  purpose?: string;   // 用途说明
 }
 
 export interface Iteration {

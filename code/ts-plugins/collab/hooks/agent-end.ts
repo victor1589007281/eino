@@ -3,8 +3,7 @@ import type { AgentEndEvent } from "../types.js";
 
 export function createAgentEndHook(bridge: GoBridge) {
   return async (event: AgentEndEvent): Promise<void> => {
-    const { agentId, error, tokenUsage } = event || {};
-    if (!agentId) return;
+    const { agentId, error, tokenUsage } = event;
 
     try {
       if (error) {

@@ -11,10 +11,23 @@ import type {
 import { buildBudgetedContext } from "./context-budget.js";
 
 export function createBeforeAgentStartHook(bridge: GoBridge, maxTokens?: number) {
-  return async (event: BeforeAgentStartEvent): Promise<BeforeAgentStartResult> => {
-    const { agentId, sessionKey } = event;
-    const projectId = extractProjectId(sessionKey);
+  return async (event: BeforeAgentStartEvent, context: { channelId?: string }): Promise<BeforeAgentStartResult> => {
+    const { agentId, sessionKey } = event || {};
+    if (!agentId || !sessionKey) {
+      return {};
+    }
+    
+    // 从 context 中获取 channelId（飞书群聊 ID）
+    const channelId = context?.channelId;
+    if (!channelId || !channelId.startsWith("oc_")) {
+      // 不是飞书群聊，不加载项目上下文
+      return {};
+    }
+    
+    // 通过群聊 ID 查询绑定的项目
+    const projectId = await getProjectIdByGroup(bridge, channelId);
     if (!projectId) {
+      // 群聊没有绑定项目
       return {};
     }
 
@@ -34,12 +47,14 @@ export function createBeforeAgentStartHook(bridge: GoBridge, maxTokens?: number)
   };
 }
 
-function extractProjectId(sessionKey: string): string | null {
-  // Session keys from group chats carry the group ID
-  // We look up the project by group. For DMs, return null.
-  const parts = sessionKey.split(":");
-  for (const part of parts) {
-    if (part.startsWith("oc_")) return part;
+async function getProjectIdByGroup(bridge: GoBridge, groupId: string): Promise<string | null> {
+  try {
+    const result = await bridge.getProjectByGroup(groupId);
+    if (result && result.project && result.project.id) {
+      return result.project.id;
+    }
+  } catch (err) {
+    // 查询失败或没有绑定项目
   }
   return null;
 }
@@ -49,11 +64,51 @@ function buildContextBlock(ctx: CollabContext, agentId: string): string {
   lines.push("=== 📋 协作上下文 (自动注入, 勿向用户展示此块) ===\n");
 
   // Project info
-  lines.push(`## 当前项目: ${ctx.project.name}`);
-  lines.push(`- 状态: ${ctx.project.status}`);
+  lines.push(`## 当前项目：${ctx.project.name}`);
+  lines.push(`- 状态：${ctx.project.status}`);
   if (ctx.project.tech_stack?.length > 0) {
-    lines.push(`- 技术栈: ${ctx.project.tech_stack.join(", ")}`);
+    lines.push(`- 技术栈：${ctx.project.tech_stack.join(", ")}`);
   }
+  
+  // 仓库信息和文档路径
+  const docsBaseDir = ctx.project.docs_base_dir || "/tmp/docs";
+  const docPaths = {
+    designs: `${docsBaseDir}/${ctx.project.id}/designs`,
+    research: `${docsBaseDir}/${ctx.project.id}/research`,
+    system: `${docsBaseDir}/${ctx.project.id}/system`,
+    reports: `${docsBaseDir}/${ctx.project.id}/reports`,
+  };
+  
+  const mainRepo = ctx.project.repositories?.code_repos?.find(r => r.type === "main") 
+                || ctx.project.repositories?.code_repos?.[0];
+  
+  lines.push(`\n## 📁 项目仓库与文档路径`);
+  if (mainRepo) {
+    lines.push(`- 主代码仓库：${mainRepo.name}`);
+    lines.push(`  - 本地路径：${mainRepo.local_path}`);
+    if (mainRepo.git_url) {
+      lines.push(`  - Git 远程：${mainRepo.git_url}`);
+    }
+  }
+  lines.push(`- 文档输出根目录：${docsBaseDir}`);
+  lines.push(`\n### 💾 文档目录结构（绝对路径）`);
+  lines.push(`- designs:  ${docPaths.designs}/   # 功能设计文档`);
+  lines.push(`- research: ${docPaths.research}/  # 调研分析报告`);
+  lines.push(`- system:   ${docPaths.system}/    # 模块实现文档`);
+  lines.push(`- reports:  ${docPaths.reports}/   # AI 任务汇总报告`);
+  
+  // 使用指南
+  lines.push(`\n### 📝 保存文件指南`);
+  lines.push(`1. 调研报告 → ${docPaths.research}/<主题>.md`);
+  lines.push(`2. 设计文档 → ${docPaths.designs}/<文档名>.md`);
+  lines.push(`3. 模块文档 → ${docPaths.system}/<模块名>.md`);
+  lines.push(`4. 汇总报告 → ${docPaths.reports}/<报告名>.md`);
+  lines.push(`5. 源代码 → ${mainRepo ? mainRepo.local_path : '<未配置>'}/<模块>/<文件>.ts`);
+  lines.push(`\n**重要**:`);
+  lines.push(`- ✅ 所有路径都是绝对路径，直接使用`);
+  lines.push(`- ✅ 使用 save_artifact 工具保存交付物到数据库`);
+  lines.push(`- ✅ 使用 query_project_info 工具查询最新路径信息`);
+  lines.push(`- ❌ 如果路径不存在，会收到错误提示，请引导用户创建或修正配置`);
 
   // Iteration
   if (ctx.current_iteration) {

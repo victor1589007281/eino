@@ -1,15 +1,13 @@
 import type { GoBridge } from "../go-bridge.js";
 import type { ToolDefinition, ToolContext } from "../types.js";
-import { getSessionChannel } from "../hooks/before-tool-call.js";
 
 export function createTaskTool(bridge: GoBridge): ToolDefinition {
   return {
-    name: "create_task",
-    description: "Create a new task with title, description, assignee, priority, and dependencies. If project_id is not provided but the message is from a group chat with bound project, it will be auto-filled.",
+    description: "Create a new task with title, description, assignee, priority, and dependencies.",
     parameters: {
       type: "object",
       properties: {
-        project_id: { type: "string", description: "Project ID (optional if from bound group chat)" },
+        project_id: { type: "string", description: "Project ID" },
         title: { type: "string", description: "Task title" },
         description: { type: "string", description: "Detailed description" },
         assignee: { type: "string", description: "Agent ID to assign" },
@@ -20,10 +18,14 @@ export function createTaskTool(bridge: GoBridge): ToolDefinition {
         deliverable: { type: "string", description: "Expected deliverable" },
         acceptance: { type: "string", description: "Acceptance criteria" },
       },
-      required: ["title", "assignee"],
+      required: ["project_id", "title", "assignee"],
     },
     async execute(params: Record<string, any>, context: ToolContext): Promise<string> {
       try {
+        // 验证必填字段
+        if (!params.project_id) {
+          return JSON.stringify({ success: false, error: "Missing required field: project_id" });
+        }
         if (!params.title) {
           return JSON.stringify({ success: false, error: "Missing required field: title" });
         }
@@ -31,22 +33,8 @@ export function createTaskTool(bridge: GoBridge): ToolDefinition {
           return JSON.stringify({ success: false, error: "Missing required field: assignee" });
         }
 
-        let projectId = params.project_id;
-        const channelId = context.channelId || getSessionChannel(context.sessionKey);
-        if (!projectId && channelId?.startsWith("oc_")) {
-          try {
-            const result = await bridge.getProjectByGroup(channelId);
-            if (result && result.project && result.project.id) {
-              projectId = result.project.id;
-              console.log(`[collab] Auto-filled project_id ${projectId} for group ${channelId}`);
-            }
-          } catch (err) {
-            console.log(`[collab] No project bound to group ${channelId}`);
-          }
-        }
-
         const task = await bridge.createTask({
-          project_id: projectId || "",
+          project_id: params.project_id,
           title: params.title,
           description: params.description || "",
           assignee: params.assignee,
@@ -69,7 +57,6 @@ export function createTaskTool(bridge: GoBridge): ToolDefinition {
 
 export function createUpdateTaskTool(bridge: GoBridge): ToolDefinition {
   return {
-    name: "update_task",
     description: "Update an existing task status, result, or other fields.",
     parameters: {
       type: "object",
@@ -101,7 +88,6 @@ export function createUpdateTaskTool(bridge: GoBridge): ToolDefinition {
 
 export function createQueryTasksTool(bridge: GoBridge): ToolDefinition {
   return {
-    name: "query_tasks",
     description: "Query tasks by project, assignee, status, or parent task.",
     parameters: {
       type: "object",
@@ -133,7 +119,6 @@ export function createQueryTasksTool(bridge: GoBridge): ToolDefinition {
 
 export function createSaveArtifactTool(bridge: GoBridge): ToolDefinition {
   return {
-    name: "save_artifact",
     description: "Save a task artifact (document, code, config, test report).",
     parameters: {
       type: "object",

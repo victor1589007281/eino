@@ -6,7 +6,7 @@ import { createAfterToolCallHook } from "./hooks/after-tool-call.js";
 import { createAgentEndHook } from "./hooks/agent-end.js";
 import { createBeforeCompactionHook } from "./hooks/before-compaction.js";
 import { createTaskTool, createUpdateTaskTool, createQueryTasksTool, createSaveArtifactTool } from "./tools/task-tools.js";
-import { createProjectTool, createSaveDecisionTool, createQueryProjectMemoryTool, createQueryProjectInfoTool } from "./tools/project-tools.js";
+import { createProjectTool, createSaveDecisionTool, createQueryProjectMemoryTool } from "./tools/project-tools.js";
 import { createStatusCommand, createPauseCommand, createTasksCommand } from "./commands/status-command.js";
 import type { PluginApi } from "./types.js";
 
@@ -20,15 +20,13 @@ interface PluginDefinition {
 const DEFAULT_GO_SERVICE_URL = "http://localhost:8090";
 
 const plugin: PluginDefinition = {
-  id: "collab",
+  id: "@team/collab",
   name: "Multi-Agent Collaboration",
   version: "1.0.0",
 
   register(api: PluginApi) {
-    const config = (api as any).pluginConfig || {};
-    const goServiceUrl = config.goServiceUrl || DEFAULT_GO_SERVICE_URL;
-    console.log("[collab] Config loaded:", JSON.stringify(config));
-    console.log("[collab] Using goServiceUrl:", goServiceUrl);
+    const config = api.getConfig?.() || {};
+    const goServiceUrl = (config as any).goServiceUrl || DEFAULT_GO_SERVICE_URL;
     const bridge = new GoBridge(goServiceUrl);
 
     // --- Lifecycle Hooks ---
@@ -41,15 +39,18 @@ const plugin: PluginDefinition = {
     api.on("agent_end", createAgentEndHook(bridge), { priority: 10 });
     api.on("before_compaction", createBeforeCompactionHook(bridge), { priority: 10 });
 
-    // --- Tools ---
-    api.registerTool(() => createTaskTool(bridge), { names: ["create_task"] });
-    api.registerTool(() => createUpdateTaskTool(bridge), { names: ["update_task"] });
-    api.registerTool(() => createQueryTasksTool(bridge), { names: ["query_tasks"] });
-    api.registerTool(() => createSaveArtifactTool(bridge), { names: ["save_artifact"] });
-    api.registerTool(() => createProjectTool(bridge), { names: ["create_project"] });
-    api.registerTool(() => createSaveDecisionTool(bridge), { names: ["save_decision"] });
-    api.registerTool(() => createQueryProjectMemoryTool(bridge), { names: ["query_project_memory"] });
-    api.registerTool(() => createQueryProjectInfoTool(bridge), { names: ["query_project_info"] });
+    // --- Tools: Task Management ---
+
+    api.registerTool(createTaskTool(bridge), { name: "create_task" });
+    api.registerTool(createUpdateTaskTool(bridge), { name: "update_task" });
+    api.registerTool(createQueryTasksTool(bridge), { name: "query_tasks" });
+    api.registerTool(createSaveArtifactTool(bridge), { name: "save_artifact" });
+
+    // --- Tools: Project Management ---
+
+    api.registerTool(createProjectTool(bridge), { name: "create_project" });
+    api.registerTool(createSaveDecisionTool(bridge), { name: "save_decision" });
+    api.registerTool(createQueryProjectMemoryTool(bridge), { name: "query_project_memory" });
 
     // --- Commands ---
 

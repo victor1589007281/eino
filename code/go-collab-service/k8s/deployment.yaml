@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go-collab-service
+  namespace: openclaw
+  labels:
+    app: go-collab-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: go-collab-service
+  template:
+    metadata:
+      labels:
+        app: go-collab-service
+    spec:
+      containers:
+      - name: go-collab-service
+        image: docker.io/library/go-collab-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8090
+        env:
+        - name: DATABASE_DSN
+          valueFrom:
+            secretKeyRef:
+              name: go-collab-service-secrets
+              key: DATABASE_DSN
+        - name: OPENCLAW_DIR
+          value: /root/.openclaw
+        - name: GIT_BASE_DIR
+          value: /home/victor/base/git
+        volumeMounts:
+        - name: openclaw-data
+          mountPath: /root/.openclaw
+          readOnly: true
+        - name: git-repos
+          mountPath: /home/victor/base/git
+          readOnly: true
+      volumes:
+      - name: openclaw-data
+        hostPath:
+          path: /home/victor/.openclaw
+          type: Directory
+      - name: git-repos
+        hostPath:
+          path: /home/victor/base/git
+          type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-collab-service
+  namespace: openclaw
+spec:
+  selector:
+    app: go-collab-service
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8090
+  type: ClusterIP

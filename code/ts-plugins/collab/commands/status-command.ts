@@ -3,8 +3,8 @@ import type { CommandContext } from "../types.js";
 
 export function createStatusCommand(bridge: GoBridge) {
   return {
-    name: "collab-status",
-    description: "Show project and task status overview. Usage: /collab-status [project_id]",
+    name: "status",
+    description: "Show project and task status overview. Usage: /status [project_id]",
     async handler(args: string[], context: CommandContext): Promise<string> {
       const projectId = args[0];
       if (!projectId) {

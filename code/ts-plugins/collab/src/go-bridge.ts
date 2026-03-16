@@ -64,6 +64,15 @@ export class GoBridge {
 
   // --- Projects ---
 
+  async listProjects(): Promise<any[]> {
+    try {
+      const res = await this.get("/api/v1/projects");
+      return res.projects || [];
+    } catch {
+      return [];
+    }
+  }
+
   async getProject(projectId: string): Promise<any> {
     return this.get(`/api/v1/projects/${projectId}`);
   }

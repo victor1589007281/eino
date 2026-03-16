@@ -11,25 +11,40 @@ import type {
 import { buildBudgetedContext } from "./context-budget.js";
 
 export function createBeforeAgentStartHook(bridge: GoBridge, maxTokens?: number) {
-  return async (event: BeforeAgentStartEvent, context: { channelId?: string }): Promise<BeforeAgentStartResult> => {
-    const { agentId, sessionKey } = event || {};
+  return async (event: BeforeAgentStartEvent, context: { channelId?: string; sessionKey?: string; agentId?: string }): Promise<BeforeAgentStartResult> => {
+    console.log("[collab][before_agent_start] event:", JSON.stringify(event));
+    console.log("[collab][before_agent_start] context:", JSON.stringify(context));
+    
+    // 从 context 中获取参数（OpenClaw 将参数放在 context 中）
+    const agentId = context?.agentId || event?.agentId;
+    const sessionKey = context?.sessionKey || event?.sessionKey;
+    
     if (!agentId || !sessionKey) {
+      console.log("[collab][before_agent_start] Missing agentId or sessionKey, skipping");
       return {};
     }
     
-    // 从 context 中获取 channelId（飞书群聊 ID）
-    const channelId = context?.channelId;
-    if (!channelId || !channelId.startsWith("oc_")) {
+    // 从 sessionKey 中提取群 ID（如 agent:architect:feishu:group:oc_xxx）
+    console.log("[collab][before_agent_start] sessionKey:", sessionKey);
+    const groupId = extractGroupIdFromSessionKey(sessionKey);
+    console.log("[collab][before_agent_start] extracted groupId:", groupId);
+    if (!groupId) {
       // 不是飞书群聊，不加载项目上下文
+      console.log("[collab][before_agent_start] No group ID in sessionKey, skipping");
       return {};
     }
+    
+    console.log("[collab][before_agent_start] groupId:", groupId);
     
     // 通过群聊 ID 查询绑定的项目
-    const projectId = await getProjectIdByGroup(bridge, channelId);
+    const projectId = await getProjectIdByGroup(bridge, groupId);
     if (!projectId) {
       // 群聊没有绑定项目
+      console.log("[collab][before_agent_start] No project bound to group:", groupId);
       return {};
     }
+    
+    console.log("[collab][before_agent_start] projectId:", projectId);
 
     const ctx = await bridge.getContext(projectId, agentId);
     if (!ctx) {
@@ -43,15 +58,29 @@ export function createBeforeAgentStartHook(bridge: GoBridge, maxTokens?: number)
       : buildContextBlock(ctx, agentId);
     return {
       prependContext: contextBlock,
+      context: {
+        projectId: projectId,
+        channelId: groupId,
+      },
     };
   };
+}
+
+function extractGroupIdFromSessionKey(sessionKey: string): string | null {
+  if (!sessionKey || typeof sessionKey !== "string") return null;
+  const parts = sessionKey.split(":");
+  for (const part of parts) {
+    if (part.startsWith("oc_")) return part;
+  }
+  return null;
 }
 
 async function getProjectIdByGroup(bridge: GoBridge, groupId: string): Promise<string | null> {
   try {
     const result = await bridge.getProjectByGroup(groupId);
-    if (result && result.project && result.project.id) {
-      return result.project.id;
+    // API 直接返回项目对象，不是嵌套格式
+    if (result && result.id) {
+      return result.id;
     }
   } catch (err) {
     // 查询失败或没有绑定项目
@@ -63,8 +92,9 @@ function buildContextBlock(ctx: CollabContext, agentId: string): string {
   const lines: string[] = [];
   lines.push("=== 📋 协作上下文 (自动注入, 勿向用户展示此块) ===\n");
 
-  // Project info
+  // Project info - 包含项目ID，方便工具使用
   lines.push(`## 当前项目：${ctx.project.name}`);
+  lines.push(`- 项目ID：${ctx.project.id}`);
   lines.push(`- 状态：${ctx.project.status}`);
   if (ctx.project.tech_stack?.length > 0) {
     lines.push(`- 技术栈：${ctx.project.tech_stack.join(", ")}`);

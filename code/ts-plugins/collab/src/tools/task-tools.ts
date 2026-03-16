@@ -36,8 +36,9 @@ export function createTaskTool(bridge: GoBridge): ToolDefinition {
         if (!projectId && channelId?.startsWith("oc_")) {
           try {
             const result = await bridge.getProjectByGroup(channelId);
-            if (result && result.project && result.project.id) {
-              projectId = result.project.id;
+            // API 直接返回项目对象，不是嵌套格式
+            if (result && result.id) {
+              projectId = result.id;
               console.log(`[collab] Auto-filled project_id ${projectId} for group ${channelId}`);
             }
           } catch (err) {

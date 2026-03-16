@@ -33,6 +33,31 @@ export function createProjectTool(bridge: GoBridge): ToolDefinition {
   };
 }
 
+// 从上下文中解析项目名称（从协作上下文块中提取）
+function extractProjectNameFromContext(context: ToolContext): string | null {
+  // 尝试从 prompt 或上下文中提取项目名称
+  const prompt = context?.prompt || "";
+  
+  // 匹配 "当前项目: xxx" 或 "项目名称: xxx" 格式
+  const match = prompt.match(/当前项目[:：]\s*(\S+)/i) || 
+                prompt.match(/项目名称[:：]\s*(\S+)/i);
+  if (match) {
+    return match[1].trim();
+  }
+  
+  return null;
+}
+
+// 从 sessionKey 中提取群 ID（如 agent:test-manager:feishu:group:oc_xxx）
+function extractGroupIdFromSessionKey(sessionKey: string): string | null {
+  if (!sessionKey || typeof sessionKey !== "string") return null;
+  const parts = sessionKey.split(":");
+  for (const part of parts) {
+    if (part.startsWith("oc_")) return part;
+  }
+  return null;
+}
+
 export function createSaveDecisionTool(bridge: GoBridge): ToolDefinition {
   return {
     name: "save_decision",
@@ -106,13 +131,60 @@ export function createQueryProjectInfoTool(bridge: GoBridge): ToolDefinition {
     parameters: {
       type: "object",
       properties: {
-        project_id: { type: "string", description: "Project ID" },
+        project_id: { type: "string", description: "Project ID (可选，不提供则自动使用系统中的项目)" },
       },
-      required: ["project_id"],
+      required: [],
     },
-    async execute(params: Record<string, any>): Promise<string> {
+    async execute(params: Record<string, any>, context: ToolContext): Promise<string> {
       try {
-        const project = await bridge.getProject(params.project_id);
+        // 从协作上下文中提取项目ID
+        let projectId = params.project_id;
+        
+        // 如果参数中没有，尝试从上下文中获取
+        if (!projectId) {
+          // 1. 尝试从 context.projectId 获取
+          if (context?.projectId) {
+            projectId = context.projectId;
+            console.log(`[collab] Using projectId from context: ${projectId}`);
+          }
+          // 2. 尝试从 sessionKey 中提取群 ID 查询
+          else if (context?.sessionKey) {
+            const groupId = extractGroupIdFromSessionKey(context.sessionKey);
+            if (groupId) {
+              try {
+                const result = await bridge.getProjectByGroup(groupId);
+                if (result && result.id) {
+                  projectId = result.id;
+                  console.log(`[collab] Auto-filled project_id ${projectId} from group ${groupId}`);
+                }
+              } catch (err) {
+                console.log(`[collab] No project bound to group ${groupId}`);
+              }
+            }
+          }
+          // 3. 尝试从 channelId 查询（如果是群 ID）
+          else if (context?.channelId?.startsWith("oc_")) {
+            try {
+              const result = await bridge.getProjectByGroup(context.channelId);
+              if (result && result.id) {
+                projectId = result.id;
+                console.log(`[collab] Auto-filled project_id ${projectId} from channelId ${context.channelId}`);
+              }
+            } catch (err) {
+              console.log(`[collab] No project bound to group ${context.channelId}`);
+            }
+          }
+        }
+        
+        if (!projectId) {
+          return JSON.stringify({ 
+            success: false, 
+            error: "未提供 project_id。请从协作上下文中获取项目ID（如 db-k8s-deploy 对应的项目ID），然后传入 project_id 参数。",
+            hint: "协作上下文中显示了项目名称和项目ID，请确保正确提取项目ID。"
+          });
+        }
+        
+        const project = await bridge.getProject(projectId);
         if (!project) {
           return JSON.stringify({ success: false, error: "Project not found" });
         }
